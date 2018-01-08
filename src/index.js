@@ -1,4 +1,4 @@
-import('./Main.elm').then(Elm => {
-  var mountNode = document.getElementById('app')
-  var app = Elm.Main.embed(mountNode)
-})
+import Elm from './Main.elm'
+
+var mountNode = document.getElementById('app')
+var app = Elm.Main.embed(mountNode)
