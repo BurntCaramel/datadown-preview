@@ -71,7 +71,7 @@ view model =
                 |> Dict.toList
                 |> List.map viewResult
     in
-        div []
+        div [ class "p-4" ]
             [ div []
                 [ textarea [ class "w-full", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
