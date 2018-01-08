@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Dict
 import Html exposing (..)
-import Html.Attributes exposing (rows)
+import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
 import Datadown exposing (Document, Section)
 import Datadown.Content exposing (Content(..))
@@ -73,7 +73,7 @@ view model =
     in
         div []
             [ div []
-                [ textarea [ rows 20, onInput ChangeInput ] [ text model.input ]
+                [ textarea [ class "w-full", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
             , div [] resultsEl
             ]
