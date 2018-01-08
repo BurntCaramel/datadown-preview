@@ -12,13 +12,27 @@ import Datadown.Process exposing (processDocument)
 
 type alias Model =
     { input : String
-    , document : Document
     }
+
+defaultInput : String
+defaultInput = """
+# Title
+
+## firstName
+Jane
+
+## lastName
+Doe
+
+## html
+```html
+<div>Welcome, {{ firstName }} {{ lastName }}!</div>
+```
+"""
 
 model : Model
 model =
-    { input = ""
-    , document = parseDocument ""
+    { input = defaultInput
     }
 
 
@@ -30,7 +44,7 @@ update : Message -> Model -> Model
 update msg model =
     case msg of
         ChangeInput newInput ->
-            { model | input = newInput, document = parseDocument newInput }
+            { model | input = newInput }
 
 
 viewContent : Content -> Html Message
