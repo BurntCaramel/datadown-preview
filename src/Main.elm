@@ -57,7 +57,7 @@ viewContent content =
             pre [] [ code [] [ text s ] ]
 
         List items ->
-            div [] (List.map viewContent items)
+            ul [] (List.map (\item -> li [] [ viewContent item ]) items)
 
 
 viewResult : (String, Result e Content) -> Html Message
