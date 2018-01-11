@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Describe datadown-preview here",
   "scripts": {
-    "build": "nwb build-web-app",
+    "build": "ls . && ls ./node_modules && ls ./node_modules/.bin && nwb build-web-app",
     "clean": "nwb clean-app",
     "dev": "nwb serve-web-app --reload",
     "test": "nwb test",
