@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Describe datadown-preview here",
   "scripts": {
-    "build": "ls . && ls ./node_modules && ls ./node_modules/.bin && nwb build-web-app",
+    "build": "ls ./node_modules/.bin && nwb build-web-app",
     "clean": "nwb clean-app",
     "dev": "nwb serve-web-app --reload",
     "test": "nwb test",
@@ -26,6 +26,7 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "elm": "^0.18.0",
     "elm-webpack-loader": "^4.4.0",
     "nwb": "0.21.x",
     "tailwind": "^1.0.1",
