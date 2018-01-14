@@ -85,11 +85,11 @@ view model =
                 |> Dict.toList
                 |> List.map viewResult
     in
-        div [ class "p-4" ]
-            [ div []
-                [ textarea [ class "w-full", rows 20, onInput ChangeInput ] [ text model.input ]
+        div [ class "flex p-4" ]
+            [ div [ class "flex-1" ]
+                [ textarea [ class "w-full font-sans", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
-            , div [] resultsEl
+            , div [ class "flex-1" ] resultsEl
             ]
 
 
