@@ -24,11 +24,14 @@ Jane
 ## lastName
 Doe
 
+## fullName
+{{ firstName }} {{ lastName }}
+
 ## html
 ```html
-<div>Welcome, {{ firstName }} {{ lastName }}!</div>
+<div>Welcome, {{ fullName }}!</div>
 ```
-"""
+""" |> String.trim
 
 model : Model
 model =
@@ -85,9 +88,9 @@ view model =
                 |> Dict.toList
                 |> List.map viewResult
     in
-        div [ class "flex p-4" ]
+        div [ class "flex h-screen p-4" ]
             [ div [ class "flex-1" ]
-                [ textarea [ class "w-full font-sans", rows 20, onInput ChangeInput ] [ text model.input ]
+                [ textarea [ class "w-full h-full font-sans", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
             , div [ class "flex-1" ] resultsEl
             ]
