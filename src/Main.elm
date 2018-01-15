@@ -191,13 +191,20 @@ view model =
                 |> Dict.toList
                 |> List.map viewResult
     in
-        div [ class "flex flex-wrap h-screen" ]
-            [ div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text model.input ]
+        div []
+            [ div [ class "flex flex-wrap h-screen" ]
+                [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
+                    [ h1 [ class "mb-4 text-blue" ] [ text document.title ]
+                    , div [] resultsEl
+                    ]
+                , div [ class "flex-1 min-w-full md:min-w-0" ]
+                    [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text model.input ]
+                    ]
                 ]
-            , div [ class "flex-1 p-4 md:pl-6" ]
-                [ h1 [ class "mb-4 text-blue" ] [ text document.title ]
-                , div [] resultsEl
+            , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
+                [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit"]
+                , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test"]
+                , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Export"]
                 ]
             ]
 
