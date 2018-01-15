@@ -71,6 +71,27 @@ Doe
 ```html
 <div>Welcome, {{ fullName }}!</div>
 ```
+
+---
+
+> ##firstName
+> Jane
+
+> ## lastName
+> Doe
+
+> ## fullName
+> Jane Doe
+
+---
+
+> ## fullName
+> Bob Marley
+
+> ## html
+```html
+<div>Welcome, Bob Marley!</div>
+```
 """ |> String.trim
 
 model : Model
@@ -112,10 +133,11 @@ viewContent : Content (Result Error (List (List Token))) -> Html Message
 viewContent content =
     case content of
         Text s ->
-            pre [ class "font-sans" ] [ text s ]
+            div [ class "font-sans w-full" ] [ text s ]
         
         Code language s ->
-            pre [] [ code [] [ text s ] ]
+            pre [ class "overflow-auto px-2 py-2 text-blue-darkest bg-blue-lightest" ]
+                [ code [ class "font-mono text-sm" ] [ text s ] ]
         
         Expressions expressionsResult ->
             case expressionsResult of
@@ -136,7 +158,9 @@ viewResultInner : Result e (Content (Result Error (List (List Token)))) -> Html 
 viewResultInner contentResult =
     case contentResult of
         Err error ->
-            div [] [ text "[error]" ]
+            case error of
+                _ ->
+                    div [] [ text "[error]" ]
         
         Ok content ->
             div [ class "mb-3" ] [ viewContent content ]
@@ -145,7 +169,7 @@ viewResultInner contentResult =
 viewResult : (String, Result e (Content (Result Error (List (List Token))))) -> Html Message
 viewResult (key, contentResult) =
     div []
-        [ h2 [] [ text key ]
+        [ h2 [ class "text-blue-dark" ] [ text key ]
         , contentResult
             |> viewResultInner
         ]
@@ -167,12 +191,12 @@ view model =
                 |> Dict.toList
                 |> List.map viewResult
     in
-        div [ class "flex h-screen p-4" ]
-            [ div [ class "flex-1" ]
-                [ textarea [ class "w-full h-full font-sans", rows 20, onInput ChangeInput ] [ text model.input ]
+        div [ class "flex flex-wrap h-screen" ]
+            [ div [ class "flex-1 min-w-full md:min-w-0" ]
+                [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
-            , div [ class "flex-1" ]
-                [ h1 [ class "mb-4" ] [ text document.title ]
+            , div [ class "flex-1 p-4 md:pl-6" ]
+                [ h1 [ class "mb-4 text-blue" ] [ text document.title ]
                 , div [] resultsEl
                 ]
             ]

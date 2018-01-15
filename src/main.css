@@ -5,7 +5,7 @@ html {
 }
 
 pre {
-  @apply .font-mono;
+  @apply .font-sans;
 }
 
 @tailwind utilities;
