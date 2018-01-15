@@ -1,13 +1,53 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Dict
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
-import Datadown exposing (Document, Section)
-import Datadown.Content exposing (Content(..))
+import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process exposing (processDocument)
+
+import Parser exposing (Error)
+
+import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
+import Expressions.Evaluate as Evaluate exposing (resolveTokens)
+
+
+type Error
+    = Parser Parser.Error
+    | Evaluate Evaluate.Error
+    -- | Process Datadown.Process.Error
+
+parseExpressions : String -> Result Error (List (List Token))
+parseExpressions input =
+    case tokenize input of
+        Err parserError ->
+            Err (Parser parserError)
+        
+        Ok tokens ->
+            Ok tokens
+
+
+resolveExpressions : Result Error (List (List Token)) -> Result String (Result Error (List (List Token)))
+resolveExpressions parsedExpressions =
+    case parsedExpressions of
+        Err error ->
+            Err "Invalid expressions"
+        
+        Ok expressions ->
+            case expressions of
+                [] ->
+                    Err "No input"
+
+                hd :: [] -> 
+                    resolveTokens (\_ -> Nothing) hd
+                        |> Result.map List.singleton
+                        |> Result.mapError Evaluate
+                        |> Ok
+                
+                _ ->
+                    Err "Can only handle one line"
 
 
 type alias Model =
@@ -50,7 +90,25 @@ update msg model =
             { model | input = newInput }
 
 
-viewContent : Content -> Html Message
+viewExpressionToken : Token -> Html Message
+viewExpressionToken token =
+    case token of
+        Identifier identifier ->
+            div [] [ text identifier ]
+        
+        Value value ->
+            div [] [ text (toString value) ]
+        
+        Operator operator ->
+            div [] [ text (toString operator) ]
+
+
+viewExpression : List Token -> Html Message
+viewExpression tokens =
+    div [] (tokens |> List.map viewExpressionToken)
+
+
+viewContent : Content (Result Error (List (List Token))) -> Html Message
 viewContent content =
     case content of
         Text s ->
@@ -58,30 +116,51 @@ viewContent content =
         
         Code language s ->
             pre [] [ code [] [ text s ] ]
+        
+        Expressions expressionsResult ->
+            case expressionsResult of
+                Err expressionsError ->
+                    h3 [] [ text "expressions error" ]
+                
+                Ok expressions ->
+                    pre [] [ code [] (List.map viewExpression expressions) ]
 
         List items ->
             ul [] (List.map (\item -> li [] [ viewContent item ]) items)
 
+        Quote document ->
+            pre [] [ code [] [ text "quoted document" ] ]
 
-viewResult : (String, Result e Content) -> Html Message
+
+viewResultInner : Result e (Content (Result Error (List (List Token)))) -> Html Message
+viewResultInner contentResult =
+    case contentResult of
+        Err error ->
+            div [] [ text "[error]" ]
+        
+        Ok content ->
+            viewContent content
+
+
+viewResult : (String, Result e (Content (Result Error (List (List Token))))) -> Html Message
 viewResult (key, contentResult) =
     div []
         [ h2 [] [ text key ]
         , contentResult
-            |> Result.toMaybe
-            |> Maybe.map viewContent
-            |> Maybe.withDefault (div [] [ text "?" ])
+            |> viewResultInner
         ]
 
 
 view : Model -> Html Message
 view model =
     let
+        document : Document (Result Error (List (List Token)))
         document =
-            parseDocument model.input
+            parseDocument parseExpressions model.input
 
+        --results : Dict String (Result Datadown.Process.Error (Content (Result Error (List (List Token)))))
         results =
-            processDocument document
+            processDocument resolveExpressions document
         
         resultsEl =
             results
