@@ -56,7 +56,7 @@ type alias Model =
 
 defaultInput : String
 defaultInput = """
-# Title
+# Welcome screen
 
 ## firstName
 Jane
@@ -139,7 +139,7 @@ viewResultInner contentResult =
             div [] [ text "[error]" ]
         
         Ok content ->
-            viewContent content
+            div [ class "mb-3" ] [ viewContent content ]
 
 
 viewResult : (String, Result e (Content (Result Error (List (List Token))))) -> Html Message
@@ -171,7 +171,10 @@ view model =
             [ div [ class "flex-1" ]
                 [ textarea [ class "w-full h-full font-sans", rows 20, onInput ChangeInput ] [ text model.input ]
                 ]
-            , div [ class "flex-1" ] resultsEl
+            , div [ class "flex-1" ]
+                [ h1 [ class "mb-4" ] [ text document.title ]
+                , div [] resultsEl
+                ]
             ]
 
 
