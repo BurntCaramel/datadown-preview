@@ -54,7 +54,7 @@ viewContent : Content -> Html Message
 viewContent content =
     case content of
         Text s ->
-            div [] [ text s ]
+            pre [ class "font-sans" ] [ text s ]
         
         Code language s ->
             pre [] [ code [] [ text s ] ]
