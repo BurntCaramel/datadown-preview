@@ -189,7 +189,6 @@ view model =
         
         resultsEl =
             results
-                |> Dict.toList
                 |> List.map viewResult
     in
         div []
