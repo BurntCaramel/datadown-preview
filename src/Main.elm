@@ -5,7 +5,7 @@ import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
-import Datadown.Process exposing (processDocument)
+import Datadown.Process exposing (processDocument, listVariablesInDocument)
 import HtmlParser
 import HtmlParser.Util
 import Parser exposing (Error)
@@ -186,12 +186,25 @@ viewResultInner contentResult =
             div [ class "mb-3" ] [ viewContent content ]
 
 
-viewResult : ( String, Result e (Content (Result Error (List (List Token)))) ) -> Html Message
-viewResult ( key, contentResult ) =
+type alias SectionViewModel e =
+    { title: String
+    , resolvedContent: Result e (Content (Result Error (List (List Token))))
+    , variables: List String
+    }
+
+
+makeSectionViewModel : (String, Result e (Content (Result Error (List (List Token))))) -> (String, List String) -> SectionViewModel e
+makeSectionViewModel (title, resolvedContent) (_, variables) =
+    SectionViewModel title resolvedContent variables
+
+
+viewSection : SectionViewModel e -> Html Message
+viewSection { title, resolvedContent, variables } =
     div []
-        [ h2 [ class "text-blue-dark" ] [ text key ]
-        , contentResult
+        [ h2 [ class "text-blue-dark" ] [ text title ]
+        , resolvedContent
             |> viewResultInner
+        -- , div [] [ text (variables |> toString) ]
         ]
 
 
@@ -202,13 +215,18 @@ view model =
         document =
             parseDocument parseExpressions model.input
 
-        --results : Dict String (Result Datadown.Process.Error (Content (Result Error (List (List Token)))))
-        results =
+        resolvedContents =
             processDocument resolveExpressions document
+        
+        sectionVariables =
+            listVariablesInDocument document
+        
+        results =
+            List.map2 makeSectionViewModel resolvedContents sectionVariables
 
         resultsEl =
             results
-                |> List.map viewResult
+                |> List.map viewSection
     in
         div []
             [ div [ class "flex flex-wrap h-screen" ]

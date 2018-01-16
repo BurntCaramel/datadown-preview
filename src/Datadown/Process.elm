@@ -1,6 +1,7 @@
 module Datadown.Process
     exposing
         ( processDocument
+        , listVariablesInDocument
         , Error
         )
 
@@ -58,6 +59,19 @@ mustache resolveVariable input =
                     |> Maybe.withDefault ""
     in
         Regex.replace Regex.All mustacheVariableRegex replacer input
+
+
+listMustacheVariables : String -> List String
+listMustacheVariables input =
+    let
+        extractor : Regex.Match -> Maybe String
+        extractor match =
+            match.submatches
+                |> List.head
+                |> Maybe.withDefault Nothing
+    in
+        Regex.find Regex.All mustacheVariableRegex input
+            |> List.filterMap extractor
 
 
 stringResolverForResults : List ( String, Result (Error e) (Content a) ) -> (String -> Maybe String)
@@ -127,3 +141,27 @@ processDocument evaluateExpressions document =
     document.sections
         |> List.foldl (foldProcessedSections evaluateExpressions) []
         |> List.reverse
+
+
+listVariablesInSection : Section a -> (String, List String)
+listVariablesInSection section =
+    let
+        variables =
+            case section.mainContent of
+                Just (Text text) ->
+                    listMustacheVariables text
+
+                Just (Code language codeText) ->
+                    listMustacheVariables codeText
+
+                _ ->
+                    []
+    in
+        (section.title, variables)
+
+
+{-| List all variables within sections in a document -}
+listVariablesInDocument : Document a -> List (String, List String)
+listVariablesInDocument document =
+    document.sections
+        |> List.map listVariablesInSection
