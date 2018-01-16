@@ -67,7 +67,7 @@ Doe
 ## fullName
 {{ firstName }} {{ lastName }}
 
-## html
+## render
 ```html
 <div>Welcome, {{ fullName }}!</div>
 ```
@@ -88,7 +88,7 @@ Doe
 > ## fullName
 > Bob Marley
 
-> ## html
+> ## render
 ```html
 <div>Welcome, Bob Marley!</div>
 ```
@@ -136,7 +136,7 @@ viewContent content =
             div [ class "font-sans w-full" ] [ text s ]
         
         Code language s ->
-            pre [ class "overflow-auto px-2 py-2 text-blue-darkest bg-blue-lightest" ]
+            pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
                 [ code [ class "font-mono text-sm" ] [ text s ] ]
         
         Expressions expressionsResult ->
@@ -145,7 +145,8 @@ viewContent content =
                     h3 [] [ text "expressions error" ]
                 
                 Ok expressions ->
-                    pre [] [ code [] (List.map viewExpression expressions) ]
+                    pre [ class "px-2 py-2 text-teal-darker bg-teal-lightest" ]
+                        [ code [ class "font-mono text-sm" ] (List.map viewExpression expressions) ]
 
         List items ->
             ul [] (List.map (\item -> li [] [ viewContent item ]) items)
