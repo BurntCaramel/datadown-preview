@@ -11,6 +11,7 @@ module Datadown.Process
 
 @docs Error
 
+
 ## Functions
 
 @docs processDocument
@@ -59,17 +60,17 @@ mustache resolveVariable input =
         Regex.replace Regex.All mustacheVariableRegex replacer input
 
 
-stringResolverForResults : List (String, (Result (Error e) (Content a))) -> (String -> Maybe String)
+stringResolverForResults : List ( String, Result (Error e) (Content a) ) -> (String -> Maybe String)
 stringResolverForResults results =
     \keyToFind ->
         let
             found =
                 results
-                    |> List.filter (\(key, result) -> key == keyToFind)
+                    |> List.filter (\( key, result ) -> key == keyToFind)
                     |> List.head
         in
             case found of
-                Just (key, Ok result) ->
+                Just ( key, Ok result ) ->
                     case result of
                         Text text ->
                             Just text
@@ -89,12 +90,12 @@ processSection resolve evaluateExpressions section =
 
         Just (Code language codeText) ->
             Ok (Code language (mustache resolve codeText))
-        
+
         Just (Expressions input) ->
             case evaluateExpressions input of
                 Ok output ->
                     Ok (Expressions output)
-                
+
                 Err error ->
                     Err (Evaluate error)
 
@@ -105,7 +106,7 @@ processSection resolve evaluateExpressions section =
             Err (NoContent section.title)
 
 
-foldProcessedSections : (a -> Result e a) -> Section a -> List (String, (Result (Error e) (Content a))) -> List (String, (Result (Error e) (Content a)))
+foldProcessedSections : (a -> Result e a) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
 foldProcessedSections evaluateExpressions section prevResults =
     let
         resolve : String -> Maybe String
@@ -116,12 +117,12 @@ foldProcessedSections evaluateExpressions section prevResults =
         result =
             processSection resolve evaluateExpressions section
     in
-        (section.title, result) :: prevResults
+        ( section.title, result ) :: prevResults
 
 
 {-| Process a document and return a result
 -}
-processDocument : (a -> Result e a) -> Document a -> List (String, (Result (Error e) (Content a)))
+processDocument : (a -> Result e a) -> Document a -> List ( String, Result (Error e) (Content a) )
 processDocument evaluateExpressions document =
     document.sections
         |> List.foldl (foldProcessedSections evaluateExpressions) []
