@@ -114,18 +114,26 @@ viewExpression tokens =
     div [] (tokens |> List.map viewExpressionToken)
 
 
+unsafeTagNames : List String
+unsafeTagNames = ["script", "link", "iframe", "object", "embed"]
+
+
+previewHTML : String -> List (Html Message)
+previewHTML source =
+    source
+        |> HtmlParser.parse
+        |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
+        |> HtmlParser.Util.toVirtualDom
+
+
 viewCodePreview : Maybe String -> String -> List (Html Message)
 viewCodePreview language source =
     case language of
         Just "html" ->
-            source
-                |> HtmlParser.parse
-                |> HtmlParser.Util.toVirtualDom
-        
+            previewHTML source
+
         Just "svg" ->
-            source
-                |> HtmlParser.parse
-                |> HtmlParser.Util.toVirtualDom
+            previewHTML source
 
         _ ->
             [ text (language |> Maybe.withDefault "none") ]
