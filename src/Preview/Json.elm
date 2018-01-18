@@ -5,6 +5,7 @@ module Preview.Json
 
 {-| Preview JSON
 
+
 ## Functions
 
 @docs view
@@ -35,11 +36,12 @@ viewArrayItem value =
     li [ class "ml-4 text-purple-light" ] [ viewValue value ]
 
 
-viewKeyValuePair : (String, JsonValue) -> List (Html msg)
-viewKeyValuePair (key, value) =
-  [ dt [ class "font-bold" ] ((viewString key) ++ [ viewSymbol ":" ])
-  , dd [ class "ml-4" ] [ viewValue value ]
-  ]
+viewKeyValuePair : ( String, JsonValue ) -> List (Html msg)
+viewKeyValuePair ( key, value ) =
+    [ dt [ class "font-bold" ] ((viewString key) ++ [ viewSymbol ":" ])
+    , dd [ class "ml-4" ] [ viewValue value ]
+    ]
+
 
 viewValue : JsonValue -> Html msg
 viewValue json =
@@ -53,7 +55,13 @@ viewValue json =
                     [ text (toString number) ]
 
                 BoolValue bool ->
-                    [ text (if bool then "true" else "false") ]
+                    [ text
+                        (if bool then
+                            "true"
+                         else
+                            "false"
+                        )
+                    ]
 
                 ArrayValue items ->
                     [ viewSymbol "["
@@ -73,7 +81,10 @@ viewValue json =
         div [ class "text-black" ] children
 
 
+
 {- Previews a JSON string as HTML -}
+
+
 view : String -> Html msg
 view source =
     let
@@ -84,6 +95,6 @@ view source =
         case result of
             Ok jsonValue ->
                 viewValue jsonValue
-            
+
             Err error ->
                 div [] [ text error ]
