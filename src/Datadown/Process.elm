@@ -27,7 +27,7 @@ import Datadown exposing (Document, Section, Content(..))
 {-| Error after processing, possibly from evaluating expressions
 -}
 type Error e
-    = NoContent String
+    = NoContentForSection String
     | UnknownKind
     | Evaluate e
 
@@ -117,7 +117,7 @@ processSection resolve evaluateExpressions section =
             Ok content
 
         Nothing ->
-            Err (NoContent section.title)
+            Err (NoContentForSection section.title)
 
 
 foldProcessedSections : (a -> Result e a) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )

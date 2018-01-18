@@ -197,6 +197,8 @@ lines =
         succeed identity
             |. optionalNewlines
             |= andThen (\l -> linesHelp [ l ]) tokens
+            |. optionalNewlines
+            |. end
 
 
 tokenize : String -> Result Error (List (List Token))

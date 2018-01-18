@@ -36,24 +36,17 @@ parseExpressions input =
             Ok tokens
 
 
-resolveExpressions : Result Error (List (List Token)) -> Result String (Result Error (List (List Token)))
+resolveExpressions : Result Error (List (List Token)) -> Result Error (Result Error (List (List Token)))
 resolveExpressions parsedExpressions =
     case parsedExpressions of
         Err error ->
-            Err "Invalid expressions"
+            Err error
 
         Ok expressions ->
-            case expressions of
-                [] ->
-                    Err "No input"
-
-                list ->
-                    evaulateTokenLines (\_ -> Nothing) list
-                        |> Result.map Tokenize.Value
-                        |> Result.map List.singleton
-                        |> Result.map List.singleton
-                        |> Result.mapError Evaluate
-                        |> Ok
+            evaulateTokenLines (\_ -> Nothing) expressions
+                |> Result.map (Tokenize.Value >> List.singleton >> List.singleton)
+                |> Result.mapError Evaluate
+                |> Ok
 
 
 type alias Model =
