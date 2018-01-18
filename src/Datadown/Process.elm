@@ -74,26 +74,20 @@ listMustacheVariables input =
             |> List.filterMap extractor
 
 
-stringResolverForResults : List ( String, Result (Error e) (Content a) ) -> (String -> Maybe String)
-stringResolverForResults results =
-    \keyToFind ->
-        let
-            found =
-                results
-                    |> List.filter (\( key, result ) -> key == keyToFind)
-                    |> List.head
-        in
-            case found of
-                Just ( key, Ok result ) ->
-                    case result of
-                        Text text ->
-                            Just text
+resolveStringForResults : (Content a -> Maybe String) -> List ( String, Result (Error e) (Content a) ) -> String -> Maybe String
+resolveStringForResults stringForContent results keyToFind =
+    let
+        found =
+            results
+                |> List.filter (\( key, result ) -> key == keyToFind)
+                |> List.head
+    in
+        case found of
+            Just ( key, Ok content ) ->
+                stringForContent content
 
-                        _ ->
-                            Nothing
-
-                _ ->
-                    Nothing
+            _ ->
+                Nothing
 
 
 processSection : (String -> Maybe String) -> (a -> Result e a) -> Section a -> Result (Error e) (Content a)
@@ -120,12 +114,12 @@ processSection resolve evaluateExpressions section =
             Err (NoContentForSection section.title)
 
 
-foldProcessedSections : (a -> Result e a) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
-foldProcessedSections evaluateExpressions section prevResults =
+foldProcessedSections : (a -> Result e a) -> (Content a -> Maybe String) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
+foldProcessedSections evaluateExpressions stringForContent section prevResults =
     let
         resolve : String -> Maybe String
         resolve =
-            stringResolverForResults prevResults
+            resolveStringForResults stringForContent prevResults
 
         result : Result (Error e) (Content a)
         result =
@@ -136,10 +130,10 @@ foldProcessedSections evaluateExpressions section prevResults =
 
 {-| Process a document and return a result
 -}
-processDocument : (a -> Result e a) -> Document a -> List ( String, Result (Error e) (Content a) )
-processDocument evaluateExpressions document =
+processDocument : (a -> Result e a) -> (Content a -> Maybe String) -> Document a -> List ( String, Result (Error e) (Content a) )
+processDocument evaluateExpressions stringForContent document =
     document.sections
-        |> List.foldl (foldProcessedSections evaluateExpressions) []
+        |> List.foldl (foldProcessedSections evaluateExpressions stringForContent) []
         |> List.reverse
 
 

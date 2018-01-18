@@ -9,8 +9,6 @@ import Datadown.Parse exposing (parseDocument)
 import Datadown.Process exposing (processDocument, listVariablesInDocument)
 import HtmlParser
 import HtmlParser.Util
-import Json.Decode
-import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
@@ -20,10 +18,6 @@ import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
 type Error
     = Parser Parser.Error
     | Evaluate Evaluate.Error
-
-
-
--- | Process Datadown.Process.Error
 
 
 parseExpressions : String -> Result Error (List (List Token))
@@ -47,6 +41,26 @@ resolveExpressions parsedExpressions =
                 |> Result.map (Tokenize.Value >> List.singleton >> List.singleton)
                 |> Result.mapError Evaluate
                 |> Ok
+
+
+stringForContent : Content (Result Error (List (List Token))) -> Maybe String
+stringForContent content =
+    case content of
+        Text text ->
+            Just text
+        
+        Expressions lines ->
+            case lines of
+                Ok ((Value value::[])::[]) ->
+                    case value of
+                        Tokenize.Float f ->
+                            Just (toString f)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
 
 
 type alias Model =
@@ -267,7 +281,7 @@ view model =
             parseDocument parseExpressions model.input
 
         resolvedContents =
-            processDocument resolveExpressions document
+            processDocument resolveExpressions stringForContent document
 
         sectionVariables =
             listVariablesInDocument document

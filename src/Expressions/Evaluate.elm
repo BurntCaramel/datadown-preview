@@ -28,8 +28,6 @@ identityForOperator op =
         
         _ ->
             1
-        
-
 
 
 floatOperator : Operator -> Float -> Float -> Float
