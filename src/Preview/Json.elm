@@ -33,13 +33,13 @@ viewString string =
 
 viewArrayItem : JsonValue -> Html msg
 viewArrayItem value =
-    li [ class "ml-4 text-purple-light" ] [ viewValue value ]
+    li [ class "mb-1 ml-4 pl-1 text-sm text-purple-light bg-purple-o-10" ] [ viewValue value ]
 
 
 viewKeyValuePair : ( String, JsonValue ) -> List (Html msg)
 viewKeyValuePair ( key, value ) =
-    [ dt [ class "font-bold" ] ((viewString key) ++ [ viewSymbol ":" ])
-    , dd [ class "ml-4" ] [ viewValue value ]
+    [ dt [ class "text-purple-darker" ] ((viewString key) ++ [ viewSymbol ":" ])
+    , dd [ class "mb-1 ml-2 pl-1 bg-purple-o-10" ] [ viewValue value ]
     ]
 
 
@@ -78,7 +78,7 @@ viewValue json =
                 NullValue ->
                     [ text "null" ]
     in
-        div [ class "text-black" ] children
+        div [ class "text-base text-black" ] children
 
 
 
@@ -94,7 +94,8 @@ view source =
     in
         case result of
             Ok jsonValue ->
-                viewValue jsonValue
+                div [ class "pt-2 pb-2 pl-2 bg-purple-o-10" ]
+                    [ viewValue jsonValue ]
 
             Err error ->
                 div [] [ text error ]

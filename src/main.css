@@ -12,4 +12,8 @@ pre {
   @apply .font-sans;
 }
 
+.bg-purple-o-10 {
+  background-color: #9561e214;
+}
+
 @tailwind utilities;
