@@ -13,7 +13,7 @@ module Preview.Json
 -}
 
 import Html exposing (..)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (class, attribute)
 import Json.Decode
 import JsonValue exposing (JsonValue(..))
 
@@ -64,15 +64,19 @@ viewValue json =
                     ]
 
                 ArrayValue items ->
-                    [ viewSymbol "["
-                    , ol [] (List.map viewArrayItem items)
-                    , viewSymbol "]"
+                    [ details [ attribute "open" "" ]
+                        [ summary [] [ viewSymbol "[" ]
+                        , ol [ class "text-base roman" ] (List.map viewArrayItem items)
+                        , viewSymbol "]"
+                        ]
                     ]
 
                 ObjectValue items ->
-                    [ viewSymbol "{"
-                    , dl [ class "ml-2" ] (List.concatMap viewKeyValuePair items)
-                    , viewSymbol "}"
+                    [ details [ attribute "open" "" ]
+                        [ summary [] [ viewSymbol "{" ]
+                        , dl [ class "ml-2 text-base roman" ] (List.concatMap viewKeyValuePair items)
+                        , viewSymbol "}"
+                        ]
                     ]
 
                 NullValue ->

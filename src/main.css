@@ -12,6 +12,10 @@ pre {
   @apply .font-sans;
 }
 
+summary {
+  list-style: none;
+}
+
 .bg-purple-o-10 {
   background-color: #9561e214;
 }
