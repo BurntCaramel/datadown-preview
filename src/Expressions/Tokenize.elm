@@ -36,6 +36,7 @@ type Operator
     | Subtract
     | Multiply
     | Divide
+    | Exponentiate
 
 
 type Value
@@ -74,6 +75,8 @@ operator =
             |. symbol "+"
         , succeed Subtract
             |. symbol "-"
+        , succeed Exponentiate
+            |. symbol "**"
         , succeed Multiply
             |. symbol "*"
         , succeed Divide
@@ -86,10 +89,10 @@ value =
     oneOf
         [ float
         , delayedCommit (symbol "-") <|
-            succeed ((*) -1)
+            succeed negate
                 |= float
         ]
-    |> map Float
+        |> map Float
 
 
 magicNumbers : Parser Value
@@ -100,7 +103,7 @@ magicNumbers =
         , succeed pi
             |. keyword "Math.pi"
         ]
-    |> map Float
+        |> map Float
 
 
 token : Parser Token

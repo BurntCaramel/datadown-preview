@@ -15,24 +15,47 @@ type Error
     | Unknown
 
 
-floatOperator : Operator -> Float -> Float -> Float
-floatOperator op a b =
+identityForOperator : Operator -> Float
+identityForOperator op =
     case op of
         Add ->
-            a + b
+            0
+        
+        Subtract ->
+            0
+        
+        _ ->
+            1
+        
+
+
+
+floatOperator : Operator -> Float -> Float -> Float
+floatOperator op =
+    case op of
+        Add ->
+            (+)
 
         Subtract ->
-            a - b
-        
+            (-)
+
         Multiply ->
-            a * b
-        
+            (*)
+
         Divide ->
-            a / b
+            (/)
+
+        Exponentiate ->
+            (^)
 
 
-requireFloat : Token -> (String -> Maybe Value) -> Result Error Float
-requireFloat token resolveIdentifier =
+floatOperatorOnList : Operator -> Float -> List Float -> Float
+floatOperatorOnList op a rest =
+    List.foldl (floatOperator op |> flip) a rest
+
+
+requireFloat : (String -> Maybe Value) -> Token -> Result Error Float
+requireFloat resolveIdentifier token =
     case token of
         Value (Float f) ->
             Ok f
@@ -49,13 +72,26 @@ requireFloat token resolveIdentifier =
             Err NotFloat
 
 
+requireFloatList : (String -> Maybe Value) -> List Token -> Result Error (List Float)
+requireFloatList resolveIdentifier tokens =
+    let
+        combineResults =
+            List.foldr (Result.map2 (::)) (Ok [])
+
+        -- From Result.Extra
+    in
+        tokens
+            |> List.map (requireFloat resolveIdentifier)
+            |> combineResults
+
+
 resolveFloat : Float -> (String -> Maybe Value) -> List Token -> Result Error Float
 resolveFloat a resolveIdentifier tokens =
     case tokens of
         b :: c :: rest ->
             case b of
                 Operator operator ->
-                    case requireFloat c resolveIdentifier of
+                    case requireFloat resolveIdentifier c of
                         Ok c ->
                             Ok (floatOperator operator a c)
 
@@ -76,13 +112,21 @@ resolveTokens : (String -> Maybe Value) -> List Token -> Result Error (List Toke
 resolveTokens resolveIdentifier tokens =
     case tokens of
         hd :: tl ->
-            case requireFloat hd resolveIdentifier of
+            case requireFloat resolveIdentifier hd of
                 Ok f ->
                     resolveFloat f resolveIdentifier tl
                         |> Result.map (\f -> [ Value (Float f) ])
 
                 Err error ->
-                    Err error
+                    case hd of
+                        Operator operator ->
+                            -- Support e.g. * 5 5 5 == 125
+                            requireFloatList resolveIdentifier tl
+                                |> Result.map (floatOperatorOnList operator (identityForOperator operator))
+                                |> Result.map (\f -> [ Value (Float f) ])
+
+                        _ ->
+                            Err error
 
         [] ->
             Ok []

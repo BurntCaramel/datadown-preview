@@ -143,7 +143,7 @@ processDocument evaluateExpressions document =
         |> List.reverse
 
 
-listVariablesInSection : Section a -> (String, List String)
+listVariablesInSection : Section a -> ( String, List String )
 listVariablesInSection section =
     let
         variables =
@@ -157,11 +157,12 @@ listVariablesInSection section =
                 _ ->
                     []
     in
-        (section.title, variables)
+        ( section.title, variables )
 
 
-{-| List all variables within sections in a document -}
-listVariablesInDocument : Document a -> List (String, List String)
+{-| List all variables within sections in a document
+-}
+listVariablesInDocument : Document a -> List ( String, List String )
 listVariablesInDocument document =
     document.sections
         |> List.map listVariablesInSection
