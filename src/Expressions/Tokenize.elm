@@ -48,6 +48,12 @@ type Token
     | Operator Operator
 
 
+type alias Piped =
+    { initial : Value
+    , steps : List (Operator Value)
+    }
+
+
 isIdentifierTailChar : Char -> Bool
 isIdentifierTailChar c =
     Char.isLower c
@@ -61,25 +67,40 @@ identifier =
         |> map Identifier
 
 
-operator : Parser Token
+operator : Parser Operator
 operator =
     oneOf
-        [ succeed (Operator Add)
+        [ succeed Add
             |. symbol "+"
-        , succeed (Operator Subtract)
+        , succeed Subtract
             |. symbol "-"
-        , succeed (Operator Multiply)
+        , succeed Multiply
             |. symbol "*"
-        , succeed (Operator Divide)
+        , succeed Divide
             |. symbol "/"
         ]
 
 
-value : Parser Token
+value : Parser Value
 value =
     oneOf
-        [ float |> map (Float >> Value)
+        [ float
+        , delayedCommit (symbol "-") <|
+            succeed ((*) -1)
+                |= float
         ]
+    |> map Float
+
+
+magicNumbers : Parser Value
+magicNumbers =
+    oneOf
+        [ succeed e
+            |. keyword "Math.e"
+        , succeed pi
+            |. keyword "Math.pi"
+        ]
+    |> map Float
 
 
 token : Parser Token
@@ -87,8 +108,12 @@ token =
     inContext "token" <|
         oneOf
             [ identifier
-            , operator
-            , value
+            , succeed Value
+                |= magicNumbers
+            , succeed Value
+                |= value
+            , succeed Operator
+                |= operator
             ]
 
 
