@@ -2,6 +2,7 @@ module Expressions.Evaluate
     exposing
         ( resolveFloat
         , resolveTokens
+        , evaulateTokenLines
         , Error(..)
         )
 
@@ -10,6 +11,7 @@ import Expressions.Tokenize exposing (Operator(..), Value(..), Token(..))
 
 type Error
     = InvalidNumberExpression
+    | NoInput
     | NotFloat
     | NoValueForIdentifier
     | Unknown
@@ -130,3 +132,63 @@ resolveTokens resolveIdentifier tokens =
 
         [] ->
             Ok []
+
+
+evaluateTokens : (String -> Maybe Value) -> Maybe Value -> List Token -> Result Error Value
+evaluateTokens resolveIdentifier previousValue tokens =
+    case tokens of
+        hd :: tl ->
+            case requireFloat resolveIdentifier hd of
+                Ok f ->
+                    resolveFloat f resolveIdentifier tl
+                        |> Result.map Float
+
+                Err error ->
+                    case hd of
+                        Operator operator ->
+                            let
+                                start : Result Error Float
+                                start =
+                                    case previousValue of
+                                        Just (Float f) ->
+                                            Ok f
+                                        
+                                        Nothing ->
+                                            Ok (identityForOperator operator)
+                                        
+                                        -- _ ->
+                                        --     Err NotFloat
+                                
+                                floatList : Result Error (List Float)
+                                floatList =
+                                    requireFloatList resolveIdentifier tl
+                            in          
+                                -- Support e.g. * 5 5 5 == 125
+                                Result.map2 (floatOperatorOnList operator) start floatList
+                                    |> Result.map Float
+
+                        _ ->
+                            Err error
+
+        [] ->
+            Err NoInput
+
+
+evaulateTokenLines : (String -> Maybe Value) -> List (List Token) -> Result Error Value
+evaulateTokenLines resolveIdentifier lines =
+    let
+        reducer : List Token -> Maybe (Result Error Value) -> Maybe (Result Error Value)
+        reducer =
+            \tokens previousResult ->
+                case previousResult of
+                    Nothing ->
+                        Just (evaluateTokens resolveIdentifier Nothing tokens)
+                    
+                    Just (Ok value) ->
+                        Just (evaluateTokens resolveIdentifier (Just value) tokens)
+                    
+                    Just (Err error) ->
+                        Just (Err error)
+    in
+        List.foldl reducer Nothing lines
+            |> Maybe.withDefault (Err NoInput)

@@ -14,7 +14,7 @@ import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
-import Expressions.Evaluate as Evaluate exposing (resolveTokens)
+import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
 
 
 type Error
@@ -47,14 +47,13 @@ resolveExpressions parsedExpressions =
                 [] ->
                     Err "No input"
 
-                hd :: [] ->
-                    resolveTokens (\_ -> Nothing) hd
+                list ->
+                    evaulateTokenLines (\_ -> Nothing) list
+                        |> Result.map Tokenize.Value
+                        |> Result.map List.singleton
                         |> Result.map List.singleton
                         |> Result.mapError Evaluate
                         |> Ok
-
-                _ ->
-                    Err "Can only handle one line"
 
 
 type alias Model =
@@ -238,7 +237,7 @@ viewResultInner contentResult =
         Err error ->
             case error of
                 _ ->
-                    div [] [ text "[error]" ]
+                    div [] [ text (toString error) ]
 
         Ok content ->
             div [ class "mb-3" ] [ viewContent content ]
