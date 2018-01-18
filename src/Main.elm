@@ -129,7 +129,8 @@ viewExpression tokens =
 
 
 unsafeTagNames : List String
-unsafeTagNames = ["script", "link", "iframe", "object", "embed"]
+unsafeTagNames =
+    [ "script", "link", "iframe", "object", "embed" ]
 
 
 previewHtml : Bool -> String -> List (Html Message)
@@ -140,7 +141,7 @@ previewHtml isSVG source =
                 |> HtmlParser.parse
                 |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
                 |> Debug.log "elements"
-        
+
         firstElement =
             List.head elements
                 |> Debug.log "first element"
@@ -151,9 +152,9 @@ previewHtml isSVG source =
                     True
 
                 _ ->
-                    False)
+                    False
+            )
                 |> Debug.log "has svg tag"
-
     in
         if isSVG && not hasSVGTag then
             elements
@@ -170,7 +171,7 @@ showCodeForLanguage language =
     case language of
         Just "json" ->
             False
-        
+
         _ ->
             True
 
@@ -183,7 +184,7 @@ viewCodePreview language source =
 
         Just "svg" ->
             previewHtml True source
-        
+
         Just "json" ->
             [ Preview.Json.view source ]
 
@@ -202,9 +203,8 @@ viewCode language source =
             else
                 []
     in
-        
-    div []
-        (codeHtmlList ++ viewCodePreview language source)
+        div []
+            (codeHtmlList ++ viewCodePreview language source)
 
 
 viewContent : Content (Result Error (List (List Token))) -> Html Message
@@ -245,14 +245,14 @@ viewResultInner contentResult =
 
 
 type alias SectionViewModel e =
-    { title: String
-    , resolvedContent: Result e (Content (Result Error (List (List Token))))
-    , variables: List String
+    { title : String
+    , resolvedContent : Result e (Content (Result Error (List (List Token))))
+    , variables : List String
     }
 
 
-makeSectionViewModel : (String, Result e (Content (Result Error (List (List Token))))) -> (String, List String) -> SectionViewModel e
-makeSectionViewModel (title, resolvedContent) (_, variables) =
+makeSectionViewModel : ( String, Result e (Content (Result Error (List (List Token)))) ) -> ( String, List String ) -> SectionViewModel e
+makeSectionViewModel ( title, resolvedContent ) ( _, variables ) =
     SectionViewModel title resolvedContent variables
 
 
@@ -262,6 +262,7 @@ viewSection { title, resolvedContent, variables } =
         [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
         , resolvedContent
             |> viewResultInner
+
         -- , div [] [ text (variables |> toString) ]
         ]
 
@@ -275,10 +276,10 @@ view model =
 
         resolvedContents =
             processDocument resolveExpressions document
-        
+
         sectionVariables =
             listVariablesInDocument document
-        
+
         results =
             List.map2 makeSectionViewModel resolvedContents sectionVariables
 
