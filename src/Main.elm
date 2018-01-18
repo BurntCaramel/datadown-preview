@@ -84,7 +84,7 @@ Doe
 
 ## data
 ```json
-{ "firstName": "{{ firstName }}", "name": "Doe", "items": ["lll", { "nested": true }] }
+{ "firstName": "{{ firstName }}", "name": "Doe", "items": ["first", { "nested": true }] }
 ```
 
 ## Header
