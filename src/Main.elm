@@ -9,7 +9,10 @@ import Datadown.Parse exposing (parseDocument)
 import Datadown.Process exposing (processDocument, listVariablesInDocument)
 import HtmlParser
 import HtmlParser.Util
+import Json.Decode
+import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
+import Preview.Json
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (resolveTokens)
 
@@ -73,6 +76,11 @@ Doe
 ## fullName
 {{ firstName }} {{ lastName }}
 
+## data
+```json
+{ "firstName": "{{ firstName }}", "name": "Doe", "items": ["lll", { "nested": true }] }
+```
+
 ## Header
 ```html
 <h1>Welcome, {{ fullName }}!</h1>
@@ -124,8 +132,8 @@ unsafeTagNames : List String
 unsafeTagNames = ["script", "link", "iframe", "object", "embed"]
 
 
-previewHTML : Bool -> String -> List (Html Message)
-previewHTML isSVG source =
+previewHtml : Bool -> String -> List (Html Message)
+previewHtml isSVG source =
     let
         elements =
             source
@@ -157,14 +165,27 @@ previewHTML isSVG source =
                 |> HtmlParser.Util.toVirtualDom
 
 
+showCodeForLanguage : Maybe String -> Bool
+showCodeForLanguage language =
+    case language of
+        Just "json" ->
+            False
+        
+        _ ->
+            True
+
+
 viewCodePreview : Maybe String -> String -> List (Html Message)
 viewCodePreview language source =
     case language of
         Just "html" ->
-            previewHTML False source
+            previewHtml False source
 
         Just "svg" ->
-            previewHTML True source
+            previewHtml True source
+        
+        Just "json" ->
+            [ Preview.Json.view source ]
 
         _ ->
             [ text (language |> Maybe.withDefault "none") ]
@@ -172,12 +193,18 @@ viewCodePreview language source =
 
 viewCode : Maybe String -> String -> Html Message
 viewCode language source =
+    let
+        codeHtmlList =
+            if showCodeForLanguage language then
+                [ pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
+                    [ code [ class "font-mono text-sm" ] [ text source ] ]
+                ]
+            else
+                []
+    in
+        
     div []
-        ([ pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
-            [ code [ class "font-mono text-sm" ] [ text source ] ]
-         ]
-            ++ viewCodePreview language source
-        )
+        (codeHtmlList ++ viewCodePreview language source)
 
 
 viewContent : Content (Result Error (List (List Token))) -> Html Message
