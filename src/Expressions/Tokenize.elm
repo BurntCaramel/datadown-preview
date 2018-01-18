@@ -34,6 +34,8 @@ import Set
 type Operator
     = Add
     | Subtract
+    | Multiply
+    | Divide
 
 
 type Value
@@ -66,6 +68,10 @@ operator =
             |. symbol "+"
         , succeed (Operator Subtract)
             |. symbol "-"
+        , succeed (Operator Multiply)
+            |. symbol "*"
+        , succeed (Operator Divide)
+            |. symbol "/"
         ]
 
 

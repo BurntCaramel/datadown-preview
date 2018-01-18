@@ -23,6 +23,12 @@ floatOperator op a b =
 
         Subtract ->
             a - b
+        
+        Multiply ->
+            a * b
+        
+        Divide ->
+            a / b
 
 
 requireFloat : Token -> (String -> Maybe Value) -> Result Error Float
