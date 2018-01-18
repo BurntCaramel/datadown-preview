@@ -3,6 +3,7 @@ module Main exposing (main)
 import Html exposing (..)
 import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
+import Svg
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process exposing (processDocument, listVariablesInDocument)
@@ -72,9 +73,14 @@ Doe
 ## fullName
 {{ firstName }} {{ lastName }}
 
-## render
+## Header
 ```html
 <h1>Welcome, {{ fullName }}!</h1>
+```
+
+## svg
+```svg
+<rect width="100" height="100" fill="red"></rect>
 ```
 """ |> String.trim
 
@@ -118,22 +124,47 @@ unsafeTagNames : List String
 unsafeTagNames = ["script", "link", "iframe", "object", "embed"]
 
 
-previewHTML : String -> List (Html Message)
-previewHTML source =
-    source
-        |> HtmlParser.parse
-        |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
-        |> HtmlParser.Util.toVirtualDom
+previewHTML : Bool -> String -> List (Html Message)
+previewHTML isSVG source =
+    let
+        elements =
+            source
+                |> HtmlParser.parse
+                |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
+                |> Debug.log "elements"
+        
+        firstElement =
+            List.head elements
+                |> Debug.log "first element"
+
+        hasSVGTag =
+            (case List.head elements of
+                Just (HtmlParser.Element "svg" _ _) ->
+                    True
+
+                _ ->
+                    False)
+                |> Debug.log "has svg tag"
+
+    in
+        if isSVG && not hasSVGTag then
+            elements
+                |> HtmlParser.Util.toVirtualDomSvg
+                |> Svg.svg []
+                |> List.singleton
+        else
+            elements
+                |> HtmlParser.Util.toVirtualDom
 
 
 viewCodePreview : Maybe String -> String -> List (Html Message)
 viewCodePreview language source =
     case language of
         Just "html" ->
-            previewHTML source
+            previewHTML False source
 
         Just "svg" ->
-            previewHTML source
+            previewHTML True source
 
         _ ->
             [ text (language |> Maybe.withDefault "none") ]
@@ -201,7 +232,7 @@ makeSectionViewModel (title, resolvedContent) (_, variables) =
 viewSection : SectionViewModel e -> Html Message
 viewSection { title, resolvedContent, variables } =
     div []
-        [ h2 [ class "text-blue-dark" ] [ text title ]
+        [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
         , resolvedContent
             |> viewResultInner
         -- , div [] [ text (variables |> toString) ]
@@ -231,7 +262,7 @@ view model =
         div []
             [ div [ class "flex flex-wrap h-screen" ]
                 [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
-                    [ h1 [ class "mb-4 text-blue" ] [ text document.title ]
+                    [ h1 [ class "mb-4 text-3xl text-blue" ] [ text document.title ]
                     , div [] resultsEl
                     ]
                 , div [ class "flex-1 min-w-full md:min-w-0" ]
