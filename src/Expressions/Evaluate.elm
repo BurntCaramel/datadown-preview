@@ -11,7 +11,6 @@ type Error
     = InvalidNumberExpression
     | NoInput
     | NotValue
-    | NotFloat
     | NoValueForIdentifier
     | Unknown
     | InvalidValuesForOperator Operator Value Value
