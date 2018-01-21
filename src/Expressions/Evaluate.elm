@@ -124,7 +124,7 @@ requireValue resolveIdentifier token =
                     Err NoValueForIdentifier
 
         _ ->
-            Err NotFloat
+            Err NotValue
 
 
 requireValueList : (String -> Maybe Value) -> List Token -> Result Error (List Value)
