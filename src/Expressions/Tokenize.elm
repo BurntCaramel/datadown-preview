@@ -41,6 +41,7 @@ type Operator
 
 type Value
     = Float Float
+    | Bool Bool
 
 
 type Token
@@ -87,12 +88,16 @@ operator =
 value : Parser Value
 value =
     oneOf
-        [ float
+        [ succeed Float
+            |= float
         , delayedCommit (symbol "-") <|
-            succeed negate
+            succeed (negate >> Float)
                 |= float
+        , succeed (Bool True)
+            |. keyword "true"
+        , succeed (Bool False)
+            |. keyword "false"
         ]
-        |> map Float
 
 
 magicNumbers : Parser Value
@@ -110,11 +115,11 @@ token : Parser Token
 token =
     inContext "token" <|
         oneOf
-            [ identifier
-            , succeed Value
+            [ succeed Value
                 |= magicNumbers
             , succeed Value
                 |= value
+            , identifier
             , succeed Operator
                 |= operator
             ]

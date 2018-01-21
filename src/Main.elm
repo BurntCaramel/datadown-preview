@@ -55,6 +55,9 @@ stringForContent content =
                     case value of
                         Tokenize.Float f ->
                             Just (toString f)
+                        
+                        Tokenize.Bool b ->
+                            Just (if b then "true" else "false")
 
                 _ ->
                     Nothing
@@ -146,11 +149,9 @@ previewHtml isSVG source =
             source
                 |> HtmlParser.parse
                 |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
-                |> Debug.log "elements"
 
         firstElement =
             List.head elements
-                |> Debug.log "first element"
 
         hasSVGTag =
             (case List.head elements of
@@ -160,7 +161,6 @@ previewHtml isSVG source =
                 _ ->
                     False
             )
-                |> Debug.log "has svg tag"
     in
         if isSVG && not hasSVGTag then
             elements

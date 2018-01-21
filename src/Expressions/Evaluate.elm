@@ -1,7 +1,6 @@
 module Expressions.Evaluate
     exposing
-        ( resolveFloat
-        , resolveTokens
+        ( processFloatExpression
         , evaulateTokenLines
         , Error(..)
         )
@@ -12,6 +11,7 @@ import Expressions.Tokenize exposing (Operator(..), Value(..), Token(..))
 type Error
     = InvalidNumberExpression
     | NoInput
+    | NotValue
     | NotFloat
     | NoValueForIdentifier
     | Unknown
@@ -64,6 +64,27 @@ requireFloat resolveIdentifier token =
             case resolveIdentifier identifier of
                 Just (Float f) ->
                     Ok f
+                
+                Just _ ->
+                    Err NotFloat
+
+                Nothing ->
+                    Err NoValueForIdentifier
+
+        _ ->
+            Err NotValue
+
+
+requireValue : (String -> Maybe Value) -> Token -> Result Error Value
+requireValue resolveIdentifier token =
+    case token of
+        Value v ->
+            Ok v
+
+        Identifier identifier ->
+            case resolveIdentifier identifier of
+                Just v ->
+                    Ok v
 
                 Nothing ->
                     Err NoValueForIdentifier
@@ -85,61 +106,31 @@ requireFloatList resolveIdentifier tokens =
             |> combineResults
 
 
-resolveFloat : Float -> (String -> Maybe Value) -> List Token -> Result Error Float
-resolveFloat a resolveIdentifier tokens =
+processFloatExpression : Float -> (String -> Maybe Value) -> List Token -> Result Error Float
+processFloatExpression left resolveIdentifier tokens =
     case tokens of
-        b :: c :: rest ->
-            case b of
-                Operator operator ->
-                    case requireFloat resolveIdentifier c of
-                        Ok c ->
-                            Ok (floatOperator operator a c)
-
-                        Err error ->
-                            Err error
-
-                _ ->
-                    Err InvalidNumberExpression
-
         [] ->
-            Ok a
+            Ok left
+
+        Operator operator :: right :: [] ->
+            requireFloat resolveIdentifier right
+                |> Result.map (floatOperator operator left)
 
         _ ->
             Err InvalidNumberExpression
-
-
-resolveTokens : (String -> Maybe Value) -> List Token -> Result Error (List Token)
-resolveTokens resolveIdentifier tokens =
-    case tokens of
-        hd :: tl ->
-            case requireFloat resolveIdentifier hd of
-                Ok f ->
-                    resolveFloat f resolveIdentifier tl
-                        |> Result.map (\f -> [ Value (Float f) ])
-
-                Err error ->
-                    case hd of
-                        Operator operator ->
-                            -- Support e.g. * 5 5 5 == 125
-                            requireFloatList resolveIdentifier tl
-                                |> Result.map (floatOperatorOnList operator (identityForOperator operator))
-                                |> Result.map (\f -> [ Value (Float f) ])
-
-                        _ ->
-                            Err error
-
-        [] ->
-            Ok []
 
 
 evaluateTokens : (String -> Maybe Value) -> Maybe Value -> List Token -> Result Error Value
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
         hd :: tl ->
-            case requireFloat resolveIdentifier hd of
-                Ok f ->
-                    resolveFloat f resolveIdentifier tl
+            case requireValue resolveIdentifier hd |> Debug.log "require value" of
+                Ok (Float f) ->
+                    processFloatExpression f resolveIdentifier tl
                         |> Result.map Float
+                
+                Ok (Bool b) ->
+                    Ok (Bool b) |> Debug.log "Had bool"
 
                 Err error ->
                     case hd of
@@ -151,11 +142,11 @@ evaluateTokens resolveIdentifier previousValue tokens =
                                         Just (Float f) ->
                                             Ok f
                                         
+                                        Just _ ->
+                                            Err NotFloat
+                                        
                                         Nothing ->
                                             Ok (identityForOperator operator)
-                                        
-                                        -- _ ->
-                                        --     Err NotFloat
                                 
                                 floatList : Result Error (List Float)
                                 floatList =
