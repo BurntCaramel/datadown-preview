@@ -37,6 +37,9 @@ type Operator
     | Multiply
     | Divide
     | Exponentiate
+    | EqualTo
+    | LessThan Bool
+    | GreaterThan Bool
 
 
 type Value
@@ -82,6 +85,16 @@ operator =
             |. symbol "*"
         , succeed Divide
             |. symbol "/"
+        , succeed EqualTo
+            |. symbol "=="
+        , succeed (LessThan True)
+            |. symbol "<="
+        , succeed (LessThan False)
+            |. symbol "<"
+        , succeed (GreaterThan True)
+            |. symbol ">="
+        , succeed (GreaterThan False)
+            |. symbol ">"
         ]
 
 
@@ -178,6 +191,7 @@ tokens =
         succeed identity
             |. optionalSpaces
             |= andThen (\t -> tokensHelp [ t ]) token
+            |. optionalSpaces
 
 
 nextLine : Parser (List Token)
@@ -192,7 +206,8 @@ linesHelp revLines =
     oneOf
         [ nextLine
             |> andThen (\l -> linesHelp (l :: revLines))
-        , succeed (List.reverse revLines)
+        , lazy <|
+            \_ -> succeed (List.reverse revLines)
         ]
 
 

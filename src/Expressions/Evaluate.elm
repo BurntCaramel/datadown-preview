@@ -1,7 +1,6 @@
 module Expressions.Evaluate
     exposing
-        ( processFloatExpression
-        , evaulateTokenLines
+        ( evaulateTokenLines
         , Error(..)
         )
 
@@ -15,64 +14,99 @@ type Error
     | NotFloat
     | NoValueForIdentifier
     | Unknown
+    | InvalidValuesForOperator Operator Value Value
 
 
-identityForOperator : Operator -> Float
+identityForOperator : Operator -> Maybe Value
 identityForOperator op =
     case op of
         Add ->
-            0
+            Just <| Float 0
         
         Subtract ->
-            0
+            Just <| Float 0
+        
+        Multiply ->
+            Just <| Float 1
         
         _ ->
-            1
+            Nothing
 
 
-floatOperator : Operator -> Float -> Float -> Float
-floatOperator op =
+processOperator : Operator -> Value -> Value -> Result Error Value
+processOperator op a b =
     case op of
         Add ->
-            (+)
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok <| Float <| a + b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
 
         Subtract ->
-            (-)
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok <| Float <| a - b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
 
         Multiply ->
-            (*)
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok <| Float <| a * b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
 
         Divide ->
-            (/)
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok <| Float <| a / b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
 
         Exponentiate ->
-            (^)
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok <| Float <| a ^ b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
+        
+        EqualTo ->
+            Ok (Bool (a == b))
+        
+        LessThan orEqual ->
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok << Bool <|
+                        if orEqual then
+                            a <= b
+                        else
+                            a < b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
+        
+        GreaterThan orEqual ->
+            case (a, b) of
+                (Float a, Float b) ->
+                    Ok << Bool <|
+                        if orEqual then
+                            a >= b
+                        else
+                            a > b
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
 
 
-floatOperatorOnList : Operator -> Float -> List Float -> Float
-floatOperatorOnList op a rest =
-    List.foldl (floatOperator op |> flip) a rest
-
-
-requireFloat : (String -> Maybe Value) -> Token -> Result Error Float
-requireFloat resolveIdentifier token =
-    case token of
-        Value (Float f) ->
-            Ok f
-
-        Identifier identifier ->
-            case resolveIdentifier identifier of
-                Just (Float f) ->
-                    Ok f
-                
-                Just _ ->
-                    Err NotFloat
-
-                Nothing ->
-                    Err NoValueForIdentifier
-
-        _ ->
-            Err NotValue
+valueOperatorOnList : Operator -> Value -> List Value -> Result Error Value
+valueOperatorOnList op a rest =
+    List.foldl ((processOperator op |> flip) >> Result.andThen) (Ok a) rest
 
 
 requireValue : (String -> Maybe Value) -> Token -> Result Error Value
@@ -93,28 +127,26 @@ requireValue resolveIdentifier token =
             Err NotFloat
 
 
-requireFloatList : (String -> Maybe Value) -> List Token -> Result Error (List Float)
-requireFloatList resolveIdentifier tokens =
+requireValueList : (String -> Maybe Value) -> List Token -> Result Error (List Value)
+requireValueList resolveIdentifier tokens =
     let
         combineResults =
             List.foldr (Result.map2 (::)) (Ok [])
-
-        -- From Result.Extra
     in
         tokens
-            |> List.map (requireFloat resolveIdentifier)
+            |> List.map (requireValue resolveIdentifier)
             |> combineResults
 
 
-processFloatExpression : Float -> (String -> Maybe Value) -> List Token -> Result Error Float
-processFloatExpression left resolveIdentifier tokens =
+processValueExpression : Value -> (String -> Maybe Value) -> List Token -> Result Error Value
+processValueExpression left resolveIdentifier tokens =
     case tokens of
         [] ->
             Ok left
 
         Operator operator :: right :: [] ->
-            requireFloat resolveIdentifier right
-                |> Result.map (floatOperator operator left)
+            requireValue resolveIdentifier right
+                |> Result.andThen (processOperator operator left)
 
         _ ->
             Err InvalidNumberExpression
@@ -124,37 +156,31 @@ evaluateTokens : (String -> Maybe Value) -> Maybe Value -> List Token -> Result 
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
         hd :: tl ->
-            case requireValue resolveIdentifier hd |> Debug.log "require value" of
-                Ok (Float f) ->
-                    processFloatExpression f resolveIdentifier tl
-                        |> Result.map Float
-                
-                Ok (Bool b) ->
-                    Ok (Bool b) |> Debug.log "Had bool"
+            case requireValue resolveIdentifier hd of
+                Ok value ->
+                    processValueExpression value resolveIdentifier tl
 
                 Err error ->
                     case hd of
                         Operator operator ->
                             let
-                                start : Result Error Float
+                                start : Result Error Value
                                 start =
                                     case previousValue of
-                                        Just (Float f) ->
-                                            Ok f
-                                        
-                                        Just _ ->
-                                            Err NotFloat
+                                        Just v ->
+                                            Ok v
                                         
                                         Nothing ->
-                                            Ok (identityForOperator operator)
+                                            identityForOperator operator
+                                                |> Result.fromMaybe NoInput
                                 
-                                floatList : Result Error (List Float)
-                                floatList =
-                                    requireFloatList resolveIdentifier tl
+                                values : Result Error (List Value)
+                                values =
+                                    requireValueList resolveIdentifier tl
                             in          
                                 -- Support e.g. * 5 5 5 == 125
-                                Result.map2 (floatOperatorOnList operator) start floatList
-                                    |> Result.map Float
+                                Result.map2 (,) start values
+                                    |> Result.andThen (uncurry <| valueOperatorOnList operator)
 
                         _ ->
                             Err error
