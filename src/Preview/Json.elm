@@ -85,10 +85,8 @@ viewValue json =
         div [ class "text-base text-black" ] children
 
 
-
-{- Previews a JSON string as HTML -}
-
-
+{-| Previews a JSON string as HTML
+-}
 view : String -> Html msg
 view source =
     let

@@ -21,13 +21,13 @@ identityForOperator op =
     case op of
         Add ->
             Just <| Float 0
-        
+
         Subtract ->
             Just <| Float 0
-        
+
         Multiply ->
             Just <| Float 1
-        
+
         _ ->
             Nothing
 
@@ -36,52 +36,54 @@ processOperator : Operator -> Value -> Value -> Result Error Value
 processOperator op a b =
     case op of
         Add ->
-            case (a, b) of
-                (Float a, Float b) ->
+            case ( a, b ) of
+                ( Float a, Float b ) ->
                     Ok <| Float <| a + b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Subtract ->
-            case (a, b) of
-                (Float a, Float b) ->
+            case ( a, b ) of
+                ( Float a, Float b ) ->
                     Ok <| Float <| a - b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Multiply ->
-            case (a, b) of
-                (Float a, Float b) ->
+            case ( a, b ) of
+                ( Float a, Float b ) ->
                     Ok <| Float <| a * b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Divide ->
-            case (a, b) of
-                (Float a, Float b) ->
+            case ( a, b ) of
+                ( Float a, Float b ) ->
                     Ok <| Float <| a / b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Exponentiate ->
-            case (a, b) of
-                (Float a, Float b) ->
+            case ( a, b ) of
+                ( Float a, Float b ) ->
                     Ok <| Float <| a ^ b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
-        
+
         EqualTo ->
             Ok (Bool (a == b))
-        
+
         LessThan orEqual ->
-            case (a, b) of
-                (Float a, Float b) ->
-                    Ok << Bool <|
+            case ( a, b ) of
+                ( Float a, Float b ) ->
+                    Ok
+                        << Bool
+                    <|
                         if orEqual then
                             a <= b
                         else
@@ -89,11 +91,13 @@ processOperator op a b =
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
-        
+
         GreaterThan orEqual ->
-            case (a, b) of
-                (Float a, Float b) ->
-                    Ok << Bool <|
+            case ( a, b ) of
+                ( Float a, Float b ) ->
+                    Ok
+                        << Bool
+                    <|
                         if orEqual then
                             a >= b
                         else
@@ -143,7 +147,7 @@ processValueExpression left resolveIdentifier tokens =
         [] ->
             Ok left
 
-        Operator operator :: right :: [] ->
+        (Operator operator) :: right :: [] ->
             requireValue resolveIdentifier right
                 |> Result.andThen (processOperator operator left)
 
@@ -168,15 +172,15 @@ evaluateTokens resolveIdentifier previousValue tokens =
                                     case previousValue of
                                         Just v ->
                                             Ok v
-                                        
+
                                         Nothing ->
                                             identityForOperator operator
                                                 |> Result.fromMaybe NoInput
-                                
+
                                 values : Result Error (List Value)
                                 values =
                                     requireValueList resolveIdentifier tl
-                            in          
+                            in
                                 -- Support e.g. * 5 5 5 == 125
                                 Result.map2 (,) start values
                                     |> Result.andThen (uncurry <| valueOperatorOnList operator)
@@ -197,10 +201,10 @@ evaulateTokenLines resolveIdentifier lines =
                 case previousResult of
                     Nothing ->
                         Just (evaluateTokens resolveIdentifier Nothing tokens)
-                    
+
                     Just (Ok value) ->
                         Just (evaluateTokens resolveIdentifier (Just value) tokens)
-                    
+
                     Just (Err error) ->
                         Just (Err error)
     in

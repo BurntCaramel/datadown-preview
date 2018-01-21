@@ -11,6 +11,7 @@ import HtmlParser
 import HtmlParser.Util
 import Parser exposing (Error)
 import Preview.Json
+import Preview.Html
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
 
@@ -48,16 +49,21 @@ stringForContent content =
     case content of
         Text text ->
             Just text
-        
+
         Expressions lines ->
             case lines of
-                Ok ((Value value::[])::[]) ->
+                Ok (((Value value) :: []) :: []) ->
                     case value of
                         Tokenize.Float f ->
                             Just (toString f)
-                        
+
                         Tokenize.Bool b ->
-                            Just (if b then "true" else "false")
+                            Just
+                                (if b then
+                                    "true"
+                                 else
+                                    "false"
+                                )
 
                 _ ->
                     Nothing
@@ -137,41 +143,6 @@ viewExpression tokens =
     div [] (tokens |> List.map viewExpressionToken)
 
 
-unsafeTagNames : List String
-unsafeTagNames =
-    [ "script", "link", "iframe", "object", "embed" ]
-
-
-previewHtml : Bool -> String -> List (Html Message)
-previewHtml isSVG source =
-    let
-        elements =
-            source
-                |> HtmlParser.parse
-                |> HtmlParser.Util.filterElements (\tagName attributes children -> not (List.member tagName unsafeTagNames))
-
-        firstElement =
-            List.head elements
-
-        hasSVGTag =
-            (case List.head elements of
-                Just (HtmlParser.Element "svg" _ _) ->
-                    True
-
-                _ ->
-                    False
-            )
-    in
-        if isSVG && not hasSVGTag then
-            elements
-                |> HtmlParser.Util.toVirtualDomSvg
-                |> Svg.svg []
-                |> List.singleton
-        else
-            elements
-                |> HtmlParser.Util.toVirtualDom
-
-
 showCodeForLanguage : Maybe String -> Bool
 showCodeForLanguage language =
     case language of
@@ -186,10 +157,10 @@ viewCodePreview : Maybe String -> String -> List (Html Message)
 viewCodePreview language source =
     case language of
         Just "html" ->
-            previewHtml False source
+            [ Preview.Html.view False source ]
 
         Just "svg" ->
-            previewHtml True source
+            [ Preview.Html.view True source ]
 
         Just "json" ->
             [ Preview.Json.view source ]
@@ -238,8 +209,8 @@ viewContent content =
             pre [] [ code [] [ text "quoted document" ] ]
 
 
-viewResultInner : Result e (Content (Result Error (List (List Token)))) -> Html Message
-viewResultInner contentResult =
+viewSectionInner : Result e (Content (Result Error (List (List Token)))) -> Html Message
+viewSectionInner contentResult =
     case contentResult of
         Err error ->
             case error of
@@ -267,7 +238,7 @@ viewSection { title, resolvedContent, variables } =
     div []
         [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
         , resolvedContent
-            |> viewResultInner
+            |> viewSectionInner
 
         -- , div [] [ text (variables |> toString) ]
         ]
