@@ -6,7 +6,8 @@ import Html.Events exposing (onInput)
 import Time exposing (Time)
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
-import Datadown.Process exposing (processDocument, listVariablesInDocument)
+import Datadown.Process as Process exposing (processDocument, listVariablesInDocument, Error)
+import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
 import Preview.Html
@@ -17,6 +18,7 @@ import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
 type Error
     = Parser Parser.Error
     | Evaluate Evaluate.Error
+    | Process Process.Error
 
 
 parseExpressions : String -> Result Error (List (List Token))
@@ -29,48 +31,35 @@ parseExpressions input =
             Ok tokens
 
 
-resolveExpressions : (String -> Maybe String) -> Result Error (List (List Token)) -> Result Error (Result Error (List (List Token)))
-resolveExpressions resolveIdentifier parsedExpressions =
+evaluateExpressions : (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
+evaluateExpressions resolveIdentifier parsedExpressions =
     case parsedExpressions of
         Err error ->
-            Err error
+            Err Evaluate.Parsing
 
         Ok expressions ->
-            evaulateTokenLines (resolveIdentifier >> Maybe.map Tokenize.Text) expressions
-                |> Result.map (Tokenize.Value >> List.singleton >> List.singleton)
-                |> Result.mapError Evaluate
-                |> Ok
+            evaulateTokenLines resolveIdentifier expressions
 
 
-stringForContent : Content (Result Error (List (List Token))) -> Maybe String
-stringForContent content =
+contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
+contentToJson model content =
     case content of
         Text text ->
-            Just text
+            Ok <| JsonValue.StringValue text
+
+        Json json ->
+            Ok json
 
         Expressions lines ->
             case lines of
                 Ok (((Value value) :: []) :: []) ->
-                    case value of
-                        Tokenize.Float f ->
-                            Just (toString f)
-
-                        Tokenize.Bool b ->
-                            Just
-                                (if b then
-                                    "true"
-                                 else
-                                    "false"
-                                )
-                        
-                        Tokenize.Text s ->
-                            Just s
+                    Ok value
 
                 _ ->
-                    Nothing
+                    Err Evaluate.CannotConvertToJson
 
         _ ->
-            Nothing
+            Err Evaluate.CannotConvertToJson
 
 
 defaultInput : String
@@ -106,7 +95,7 @@ Doe
 
 type alias Model =
     { input : String
-    , now: Time
+    , now : Time
     }
 
 
@@ -129,7 +118,7 @@ update msg model =
     case msg of
         ChangeInput newInput ->
             ( { model | input = newInput }, Cmd.none )
-        
+
         Time time ->
             ( { model | now = time }, Cmd.none )
 
@@ -137,7 +126,7 @@ update msg model =
 subscriptions : Model -> Sub Message
 subscriptions model =
     Sub.batch
-        [ Time.every Time.second Time
+        [--Time.every Time.second Time
         ]
 
 
@@ -209,6 +198,9 @@ viewContent content =
         Code language source ->
             viewCode language source
 
+        Json json ->
+            Preview.Json.viewJson json
+
         Expressions expressionsResult ->
             case expressionsResult of
                 Err expressionsError ->
@@ -268,7 +260,7 @@ view model =
             parseDocument parseExpressions model.input
 
         resolvedContents =
-            processDocument resolveExpressions stringForContent document
+            processDocument evaluateExpressions (contentToJson model) document
 
         sectionVariables =
             listVariablesInDocument document

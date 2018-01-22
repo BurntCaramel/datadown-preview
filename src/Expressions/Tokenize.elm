@@ -7,7 +7,6 @@ module Expressions.Tokenize
         , lines
         , tokenize
         , Token(..)
-        , Value(..)
         , Operator(..)
         )
 
@@ -29,6 +28,7 @@ import Parser exposing (..)
 import Parser.LanguageKit exposing (variable)
 import Char
 import Set
+import JsonValue exposing (JsonValue(..))
 
 
 type Operator
@@ -42,22 +42,10 @@ type Operator
     | GreaterThan Bool
 
 
-type Value
-    = Float Float
-    | Bool Bool
-    | Text String
-
-
 type Token
     = Identifier String
-    | Value Value
+    | Value JsonValue
     | Operator Operator
-
-
-type alias Piped =
-    { initial : Value
-    , steps : List (Operator Value)
-    }
 
 
 isIdentifierTailChar : Char -> Bool
@@ -99,22 +87,22 @@ operator =
         ]
 
 
-value : Parser Value
+value : Parser JsonValue
 value =
     oneOf
-        [ succeed Float
+        [ succeed NumericValue
             |= float
         , delayedCommit (symbol "-") <|
-            succeed (negate >> Float)
+            succeed (negate >> NumericValue)
                 |= float
-        , succeed (Bool True)
+        , succeed (BoolValue True)
             |. keyword "true"
-        , succeed (Bool False)
+        , succeed (BoolValue False)
             |. keyword "false"
         ]
 
 
-magicNumbers : Parser Value
+magicNumbers : Parser JsonValue
 magicNumbers =
     oneOf
         [ succeed e
@@ -122,7 +110,7 @@ magicNumbers =
         , succeed pi
             |. keyword "Math.pi"
         ]
-        |> map Float
+        |> map NumericValue
 
 
 token : Parser Token

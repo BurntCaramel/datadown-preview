@@ -1,7 +1,6 @@
 module Datadown.Parse
     exposing
         ( parseDocument
-        , parseSection
         )
 
 {-| Parse Datadown documents
@@ -9,52 +8,64 @@ module Datadown.Parse
 
 # Run Parsers
 
-@docs parseDocument, parseSection
+@docs parseDocument
 
 -}
 
 import Datadown exposing (Document, Section, Content(..))
 import Dict
+import Regex exposing (Regex)
 import Markdown.Block as Block exposing (Block(..))
 import Markdown.Inline as Inline exposing (Inline(..))
 
 
-{-| Parses a Datadown section
-
-    parseSection """
-
-
-## Section
-
-  - first
-  - second
-  - third
-    """
-
--}
-parseSection : List (Block b i) -> Section a
-parseSection blocks =
-    { title = ""
-    , mainContent = Nothing
-    , secondaryContent = Dict.empty
-    }
+mustacheExpressionRegex : Regex
+mustacheExpressionRegex =
+    Regex.regex "{{([^}]*)}}"
 
 
-processContentBlock : Block b i -> Maybe (Content a)
-processContentBlock block =
-    case block of
-        PlainInlines inlines ->
-            Just (Datadown.Text (Inline.extractText inlines))
+listMustacheExpressions : String -> List String
+listMustacheExpressions input =
+    let
+        extractor : Regex.Match -> Maybe String
+        extractor match =
+            match.submatches
+                |> List.head
+                |> Maybe.withDefault Nothing
+    in
+        Regex.find Regex.All mustacheExpressionRegex input
+            |> List.filterMap extractor
 
-        Paragraph rawText inlines ->
-            Just (Datadown.Text (Inline.extractText inlines))
 
-        _ ->
-            Nothing
+processContentBlock : (String -> a) -> Block b i -> Maybe ( Content a, List ( String, a ) )
+processContentBlock parseExpressions block =
+    let
+        maybeText =
+            case block of
+                PlainInlines inlines ->
+                    Just (Inline.extractText inlines)
+
+                Paragraph rawText inlines ->
+                    Just (Inline.extractText inlines)
+
+                _ ->
+                    Nothing
+    in
+        case maybeText of
+            Just text ->
+                let
+                    expressionPairs =
+                        listMustacheExpressions text
+                            |> List.map (\s -> ( s, parseExpressions s ))
+                in
+                    Just ( Datadown.Text text, expressionPairs )
+
+            Nothing ->
+                Nothing
 
 
-addContentToDocument : Content a -> Document a -> Document a
-addContentToDocument content document =
+addContentToDocument : Content a -> List ( String, a ) -> Document a -> Document a
+addContentToDocument content expressions document =
     let
         newSections : List (Section a)
         newSections =
@@ -62,13 +73,25 @@ addContentToDocument content document =
                 [] ->
                     []
 
-                -- Error, content must belong to an open section
                 section :: sectionsTail ->
-                    { section | mainContent = Just content } :: sectionsTail
+                    { section
+                        | mainContent = Just content
+                        , inlineExpressions = Dict.union section.inlineExpressions (Dict.fromList expressions)
+                    }
+                        :: sectionsTail
     in
         { document
             | sections = newSections
         }
+
+
+sectionWithTitle : String -> Section a
+sectionWithTitle title =
+    { title = title
+    , mainContent = Nothing
+    , secondaryContent = Dict.empty
+    , inlineExpressions = Dict.empty
+    }
 
 
 processDocumentBlock : (String -> a) -> Block b i -> Document a -> Document a
@@ -86,17 +109,25 @@ processDocumentBlock parseExpressions block document =
                         |> String.trim
             in
                 { document
-                    | sections = { title = title, mainContent = Nothing, secondaryContent = Dict.empty } :: document.sections
+                    | sections = (sectionWithTitle title) :: document.sections
                 }
 
         Block.List listBlock items ->
             let
-                contentItems : List (Content a)
-                contentItems =
-                    List.map (List.filterMap processContentBlock) items
+                contentAndExpressions : List ( Content a, List ( String, a ) )
+                contentAndExpressions =
+                    List.map (List.filterMap (processContentBlock parseExpressions)) items
                         |> List.concat
+
+                contentItems =
+                    contentAndExpressions
+                        |> List.map Tuple.first
+
+                expressions =
+                    contentAndExpressions
+                        |> List.concatMap Tuple.second
             in
-                addContentToDocument (Datadown.List contentItems) document
+                addContentToDocument (Datadown.List contentItems) expressions document
 
         BlockQuote blocks ->
             let
@@ -104,29 +135,33 @@ processDocumentBlock parseExpressions block document =
                 innerDocument =
                     processDocument parseExpressions blocks
             in
-                addContentToDocument (Datadown.Quote innerDocument) document
+                addContentToDocument (Datadown.Quote innerDocument) [] document
 
         CodeBlock codeBlock text ->
             let
-                code =
+                expressionPairsFor text =
+                    listMustacheExpressions text
+                        |> List.map (\s -> ( s, parseExpressions s ))
+
+                ( content, expressionPairs ) =
                     case codeBlock of
                         Block.Fenced isOpen fence ->
                             case fence.language of
                                 Nothing ->
-                                    Expressions (parseExpressions text)
+                                    ( Expressions (parseExpressions text), [] )
 
                                 _ ->
-                                    Code fence.language text
+                                    ( Code fence.language text, expressionPairsFor text )
 
                         _ ->
-                            Code Nothing text
+                            ( Code Nothing text, expressionPairsFor text )
             in
-                addContentToDocument code document
+                addContentToDocument content expressionPairs document
 
         _ ->
-            case processContentBlock block of
-                Just content ->
-                    addContentToDocument content document
+            case processContentBlock parseExpressions block of
+                Just ( content, expressions ) ->
+                    addContentToDocument content expressions document
 
                 Nothing ->
                     document

@@ -2,7 +2,7 @@ module Datadown.Process
     exposing
         ( processDocument
         , listVariablesInDocument
-        , Error
+        , Error(..)
         )
 
 {-| Process
@@ -22,14 +22,20 @@ module Datadown.Process
 import Dict exposing (Dict(..))
 import Regex exposing (Regex)
 import Datadown exposing (Document, Section, Content(..))
+import JsonValue exposing (JsonValue)
 
 
 {-| Error after processing, possibly from evaluating expressions
 -}
 type Error e
     = NoContentForSection String
+    | NoValueForIdentifier String
+    | CannotConvertContent
+    | NoSection String
     | UnknownKind
     | Evaluate e
+    | EvaluatingExpression String e
+    | UnknownExpression
 
 
 type alias Resolved e a =
@@ -40,23 +46,34 @@ type alias Resolved e a =
 
 mustacheVariableRegex : Regex
 mustacheVariableRegex =
-    Regex.regex "{{\\s?(.+?)\\s?}}"
+    Regex.regex "{{([^}]*)}}"
 
 
-mustache : (String -> Maybe String) -> String -> String
+jsonToString : JsonValue -> String
+jsonToString json =
+    case json of
+        JsonValue.StringValue s ->
+            s
+
+        JsonValue.NumericValue f ->
+            toString f
+
+        _ ->
+            toString json
+
+
+mustache : (String -> Maybe JsonValue) -> String -> String
 mustache resolveVariable input =
     let
         replacer : Regex.Match -> String
         replacer match =
-            let
-                key =
-                    match.submatches
-                        |> List.head
-                        |> Maybe.withDefault Nothing
-                        |> Maybe.withDefault ""
-            in
-                resolveVariable key
-                    |> Maybe.withDefault ""
+            match.submatches
+                |> List.head
+                |> Maybe.withDefault Nothing
+                |> Maybe.withDefault ""
+                |> resolveVariable
+                |> Maybe.map jsonToString
+                |> Maybe.withDefault "?"
     in
         Regex.replace Regex.All mustacheVariableRegex replacer input
 
@@ -74,66 +91,86 @@ listMustacheVariables input =
             |> List.filterMap extractor
 
 
-resolveStringForResults : (Content a -> Maybe String) -> List ( String, Result (Error e) (Content a) ) -> String -> Maybe String
-resolveStringForResults stringForContent results keyToFind =
+contentForKeyInResults : List ( a, r ) -> a -> Maybe r
+contentForKeyInResults results key =
+    results
+        |> List.filter (\( key_, result ) -> key_ == key)
+        |> List.head
+        |> Maybe.map Tuple.second
+
+
+processSection : (String -> Result (Error e) JsonValue) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> Result (Error e) (Content a)
+processSection valueForIdentifier evaluateExpression section =
     let
-        found =
-            results
-                |> List.filter (\( key, result ) -> key == keyToFind)
-                |> List.head
+        expressionForString : String -> Maybe a
+        expressionForString s =
+            section.inlineExpressions
+                |> Debug.log ("inlineExpressions a: " ++ (toString s))
+                |> Dict.get s
+                |> Debug.log "inlineExpressions b"
+
+        resolveExpressionString : String -> Maybe JsonValue
+        resolveExpressionString s =
+            expressionForString s
+                |> Debug.log "expressionForString"
+                |> Maybe.andThen (evaluateExpression valueForIdentifier >> Result.toMaybe)
+                |> Debug.log ("resolve expression " ++ (toString s))
     in
-        case found of
-            Just ( key, Ok content ) ->
-                stringForContent content
+        case section.mainContent of
+            Just (Text text) ->
+                Ok (Text (mustache resolveExpressionString text))
 
-            _ ->
-                Nothing
+            Just (Code language codeText) ->
+                Ok (Code language (mustache resolveExpressionString codeText))
 
+            Just (Expressions input) ->
+                case evaluateExpression valueForIdentifier input of
+                    Ok json ->
+                        Ok (Json json)
 
-processSection : (String -> Maybe String) -> ((String -> Maybe String) -> a -> Result e a) -> Section a -> Result (Error e) (Content a)
-processSection resolve evaluateExpressions section =
-    case section.mainContent of
-        Just (Text text) ->
-            Ok (Text (mustache resolve text))
+                    Err error ->
+                        Err (Evaluate error)
 
-        Just (Code language codeText) ->
-            Ok (Code language (mustache resolve codeText))
+            Just content ->
+                Ok content
 
-        Just (Expressions input) ->
-            case evaluateExpressions resolve input of
-                Ok output ->
-                    Ok (Expressions output)
-
-                Err error ->
-                    Err (Evaluate error)
-
-        Just content ->
-            Ok content
-
-        Nothing ->
-            Err (NoContentForSection section.title)
+            Nothing ->
+                Err (NoContentForSection section.title)
 
 
-foldProcessedSections : ((String -> Maybe String) -> a -> Result e a) -> (Content a -> Maybe String) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
-foldProcessedSections evaluateExpressions stringForContent section prevResults =
+foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
+foldProcessedSections evaluateExpression contentToJson section prevResults =
     let
-        resolve : String -> Maybe String
-        resolve =
-            resolveStringForResults stringForContent prevResults
+        contentForKey : String -> Result (Error e) (Content a)
+        contentForKey key =
+            case contentForKeyInResults prevResults key of
+                Just (Ok c) ->
+                    Ok c
+
+                Just (Err e) ->
+                    Err e
+
+                Nothing ->
+                    Err (NoValueForIdentifier key)
+
+        valueForIdentifier : String -> Result (Error e) JsonValue
+        valueForIdentifier key =
+            contentForKey key
+                |> Result.andThen (contentToJson >> Result.mapError (always CannotConvertContent))
 
         result : Result (Error e) (Content a)
         result =
-            processSection resolve evaluateExpressions section
+            processSection valueForIdentifier evaluateExpression section
     in
         ( section.title, result ) :: prevResults
 
 
 {-| Process a document and return a result
 -}
-processDocument : ((String -> Maybe String) -> a -> Result e a) -> (Content a -> Maybe String) -> Document a -> List ( String, Result (Error e) (Content a) )
-processDocument evaluateExpressions stringForContent document =
+processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> List ( String, Result (Error e) (Content a) )
+processDocument evaluateExpression contentToJson document =
     document.sections
-        |> List.foldl (foldProcessedSections evaluateExpressions stringForContent) []
+        |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []
         |> List.reverse
 
 

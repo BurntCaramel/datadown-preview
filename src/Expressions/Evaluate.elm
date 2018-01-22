@@ -4,56 +4,59 @@ module Expressions.Evaluate
         , Error(..)
         )
 
-import Expressions.Tokenize exposing (Operator(..), Value(..), Token(..))
+import Expressions.Tokenize exposing (Operator(..), Token(..))
+import JsonValue exposing (JsonValue(..))
 
 
 type Error
     = InvalidNumberExpression
+    | Parsing
     | NoInput
     | NotValue
     | NoValueForIdentifier
     | Unknown
-    | InvalidValuesForOperator Operator Value Value
+    | InvalidValuesForOperator Operator JsonValue JsonValue
+    | CannotConvertToJson
 
 
-identityForOperator : Operator -> Maybe Value
+identityForOperator : Operator -> Maybe JsonValue
 identityForOperator op =
     case op of
         Add ->
-            Just <| Float 0
+            Just <| NumericValue 0
 
         Subtract ->
-            Just <| Float 0
+            Just <| NumericValue 0
 
         Multiply ->
-            Just <| Float 1
+            Just <| NumericValue 1
 
         _ ->
             Nothing
 
 
-toFloat : Value -> Maybe Float
+toFloat : JsonValue -> Maybe Float
 toFloat value =
     case value of
-        Float f ->
+        NumericValue f ->
             Just f
-        
-        Text s ->
+
+        StringValue s ->
             s
-            |> String.toFloat
-            |> Result.toMaybe
-        
+                |> String.toFloat
+                |> Result.toMaybe
+
         _ ->
             Nothing
 
 
-processOperator : Operator -> Value -> Value -> Result Error Value
+processOperator : Operator -> JsonValue -> JsonValue -> Result Error JsonValue
 processOperator op a b =
     case op of
         Add ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| Float <| a + b
+                    Ok <| NumericValue <| a + b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
@@ -61,7 +64,7 @@ processOperator op a b =
         Subtract ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| Float <| a - b
+                    Ok <| NumericValue <| a - b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
@@ -69,7 +72,7 @@ processOperator op a b =
         Multiply ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| Float <| a * b
+                    Ok <| NumericValue <| a * b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
@@ -77,7 +80,7 @@ processOperator op a b =
         Divide ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| Float <| a / b
+                    Ok <| NumericValue <| a / b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
@@ -85,49 +88,47 @@ processOperator op a b =
         Exponentiate ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| Float <| a ^ b
+                    Ok <| NumericValue <| a ^ b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         EqualTo ->
-            Ok (Bool (a == b))
+            Ok (BoolValue (a == b))
 
         LessThan orEqual ->
             case ( a, b ) of
-                ( Float a, Float b ) ->
-                    Ok
-                        << Bool
-                    <|
-                        if orEqual then
-                            a <= b
-                        else
-                            a < b
+                ( NumericValue a, NumericValue b ) ->
+                    Ok <|
+                        BoolValue <|
+                            if orEqual then
+                                a <= b
+                            else
+                                a < b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         GreaterThan orEqual ->
             case ( a, b ) of
-                ( Float a, Float b ) ->
-                    Ok
-                        << Bool
-                    <|
-                        if orEqual then
-                            a >= b
-                        else
-                            a > b
+                ( NumericValue a, NumericValue b ) ->
+                    Ok <|
+                        BoolValue <|
+                            if orEqual then
+                                a >= b
+                            else
+                                a > b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
 
-valueOperatorOnList : Operator -> Value -> List Value -> Result Error Value
+valueOperatorOnList : Operator -> JsonValue -> List JsonValue -> Result Error JsonValue
 valueOperatorOnList op a rest =
     List.foldl ((processOperator op |> flip) >> Result.andThen) (Ok a) rest
 
 
-requireValue : (String -> Maybe Value) -> Token -> Result Error Value
+requireValue : (String -> Result e JsonValue) -> Token -> Result Error JsonValue
 requireValue resolveIdentifier token =
     case token of
         Value v ->
@@ -135,17 +136,17 @@ requireValue resolveIdentifier token =
 
         Identifier identifier ->
             case resolveIdentifier identifier of
-                Just v ->
+                Ok v ->
                     Ok v
 
-                Nothing ->
+                Err e ->
                     Err NoValueForIdentifier
 
         _ ->
             Err NotValue
 
 
-requireValueList : (String -> Maybe Value) -> List Token -> Result Error (List Value)
+requireValueList : (String -> Result e JsonValue) -> List Token -> Result Error (List JsonValue)
 requireValueList resolveIdentifier tokens =
     let
         combineResults =
@@ -156,7 +157,7 @@ requireValueList resolveIdentifier tokens =
             |> combineResults
 
 
-processValueExpression : Value -> (String -> Maybe Value) -> List Token -> Result Error Value
+processValueExpression : JsonValue -> (String -> Result e JsonValue) -> List Token -> Result Error JsonValue
 processValueExpression left resolveIdentifier tokens =
     case tokens of
         [] ->
@@ -170,7 +171,7 @@ processValueExpression left resolveIdentifier tokens =
             Err InvalidNumberExpression
 
 
-evaluateTokens : (String -> Maybe Value) -> Maybe Value -> List Token -> Result Error Value
+evaluateTokens : (String -> Result e JsonValue) -> Maybe JsonValue -> List Token -> Result Error JsonValue
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
         hd :: tl ->
@@ -182,7 +183,7 @@ evaluateTokens resolveIdentifier previousValue tokens =
                     case hd of
                         Operator operator ->
                             let
-                                start : Result Error Value
+                                start : Result Error JsonValue
                                 start =
                                     case previousValue of
                                         Just v ->
@@ -192,7 +193,7 @@ evaluateTokens resolveIdentifier previousValue tokens =
                                             identityForOperator operator
                                                 |> Result.fromMaybe NoInput
 
-                                values : Result Error (List Value)
+                                values : Result Error (List JsonValue)
                                 values =
                                     requireValueList resolveIdentifier tl
                             in
@@ -207,10 +208,10 @@ evaluateTokens resolveIdentifier previousValue tokens =
             Err NoInput
 
 
-evaulateTokenLines : (String -> Maybe Value) -> List (List Token) -> Result Error Value
+evaulateTokenLines : (String -> Result e JsonValue) -> List (List Token) -> Result Error JsonValue
 evaulateTokenLines resolveIdentifier lines =
     let
-        reducer : List Token -> Maybe (Result Error Value) -> Maybe (Result Error Value)
+        reducer : List Token -> Maybe (Result Error JsonValue) -> Maybe (Result Error JsonValue)
         reducer =
             \tokens previousResult ->
                 case previousResult of

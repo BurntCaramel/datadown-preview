@@ -1,6 +1,7 @@
 module Preview.Json
     exposing
         ( view
+        , viewJson
         )
 
 {-| Preview JSON
@@ -83,6 +84,14 @@ viewValue json =
                     [ text "null" ]
     in
         div [ class "text-base text-black" ] children
+
+
+{-| Previews a JSON value as HTML
+-}
+viewJson : JsonValue -> Html msg
+viewJson json =
+    div [ class "pt-2 pb-2 pl-2 bg-purple-o-10" ]
+        [ viewValue json ]
 
 
 {-| Previews a JSON string as HTML

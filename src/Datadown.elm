@@ -15,6 +15,7 @@ module Datadown
 -}
 
 import Dict exposing (Dict)
+import JsonValue exposing (JsonValue)
 
 
 {-| Content, such as plain text, code, lists, etc
@@ -25,6 +26,7 @@ type Content a
     | Expressions a -- ```
     | List (List (Content a)) -- -
     | Quote (Document a) -- >
+    | Json JsonValue
 
 
 {-| A section of data
@@ -33,6 +35,7 @@ type alias Section a =
     { title : String
     , mainContent : Maybe (Content a)
     , secondaryContent : Dict String (Content a)
+    , inlineExpressions : Dict String a
     }
 
 
