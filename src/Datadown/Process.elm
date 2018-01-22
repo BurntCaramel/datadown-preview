@@ -90,7 +90,7 @@ resolveStringForResults stringForContent results keyToFind =
                 Nothing
 
 
-processSection : (String -> Maybe String) -> (a -> Result e a) -> Section a -> Result (Error e) (Content a)
+processSection : (String -> Maybe String) -> ((String -> Maybe String) -> a -> Result e a) -> Section a -> Result (Error e) (Content a)
 processSection resolve evaluateExpressions section =
     case section.mainContent of
         Just (Text text) ->
@@ -100,7 +100,7 @@ processSection resolve evaluateExpressions section =
             Ok (Code language (mustache resolve codeText))
 
         Just (Expressions input) ->
-            case evaluateExpressions input of
+            case evaluateExpressions resolve input of
                 Ok output ->
                     Ok (Expressions output)
 
@@ -114,7 +114,7 @@ processSection resolve evaluateExpressions section =
             Err (NoContentForSection section.title)
 
 
-foldProcessedSections : (a -> Result e a) -> (Content a -> Maybe String) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
+foldProcessedSections : ((String -> Maybe String) -> a -> Result e a) -> (Content a -> Maybe String) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
 foldProcessedSections evaluateExpressions stringForContent section prevResults =
     let
         resolve : String -> Maybe String
@@ -130,7 +130,7 @@ foldProcessedSections evaluateExpressions stringForContent section prevResults =
 
 {-| Process a document and return a result
 -}
-processDocument : (a -> Result e a) -> (Content a -> Maybe String) -> Document a -> List ( String, Result (Error e) (Content a) )
+processDocument : ((String -> Maybe String) -> a -> Result e a) -> (Content a -> Maybe String) -> Document a -> List ( String, Result (Error e) (Content a) )
 processDocument evaluateExpressions stringForContent document =
     document.sections
         |> List.foldl (foldProcessedSections evaluateExpressions stringForContent) []

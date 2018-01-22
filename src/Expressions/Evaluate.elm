@@ -32,44 +32,59 @@ identityForOperator op =
             Nothing
 
 
+toFloat : Value -> Maybe Float
+toFloat value =
+    case value of
+        Float f ->
+            Just f
+        
+        Text s ->
+            s
+            |> String.toFloat
+            |> Result.toMaybe
+        
+        _ ->
+            Nothing
+
+
 processOperator : Operator -> Value -> Value -> Result Error Value
 processOperator op a b =
     case op of
         Add ->
-            case ( a, b ) of
-                ( Float a, Float b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| Float <| a + b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Subtract ->
-            case ( a, b ) of
-                ( Float a, Float b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| Float <| a - b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Multiply ->
-            case ( a, b ) of
-                ( Float a, Float b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| Float <| a * b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Divide ->
-            case ( a, b ) of
-                ( Float a, Float b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| Float <| a / b
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
         Exponentiate ->
-            case ( a, b ) of
-                ( Float a, Float b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| Float <| a ^ b
 
                 _ ->

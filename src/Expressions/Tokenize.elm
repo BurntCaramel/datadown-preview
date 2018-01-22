@@ -45,6 +45,7 @@ type Operator
 type Value
     = Float Float
     | Bool Bool
+    | Text String
 
 
 type Token

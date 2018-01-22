@@ -29,14 +29,14 @@ parseExpressions input =
             Ok tokens
 
 
-resolveExpressions : Result Error (List (List Token)) -> Result Error (Result Error (List (List Token)))
-resolveExpressions parsedExpressions =
+resolveExpressions : (String -> Maybe String) -> Result Error (List (List Token)) -> Result Error (Result Error (List (List Token)))
+resolveExpressions resolveIdentifier parsedExpressions =
     case parsedExpressions of
         Err error ->
             Err error
 
         Ok expressions ->
-            evaulateTokenLines (\_ -> Nothing) expressions
+            evaulateTokenLines (resolveIdentifier >> Maybe.map Tokenize.Text) expressions
                 |> Result.map (Tokenize.Value >> List.singleton >> List.singleton)
                 |> Result.mapError Evaluate
                 |> Ok
@@ -62,6 +62,9 @@ stringForContent content =
                                  else
                                     "false"
                                 )
+                        
+                        Tokenize.Text s ->
+                            Just s
 
                 _ ->
                     Nothing
@@ -209,7 +212,7 @@ viewContent content =
         Expressions expressionsResult ->
             case expressionsResult of
                 Err expressionsError ->
-                    h3 [] [ text "expressions error" ]
+                    h3 [] [ text <| toString expressionsError ]
 
                 Ok expressions ->
                     pre [ class "px-2 py-2 text-teal-darker bg-teal-lightest" ]
