@@ -298,8 +298,15 @@ view model =
                 |> List.map viewSection
         
         introEl =
-            resolved.intro
-                |> viewContentResult True
+            case resolved.intro of
+                Ok content ->
+                   viewContentResult True (Ok content)
+                
+                Err (Process.NoContentForSection _) ->
+                    text ""
+
+                Err error ->
+                    div [] [ text <| toString error ]
     in
         div []
             [ div [ class "flex flex-wrap h-screen" ]
