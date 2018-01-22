@@ -45,11 +45,6 @@ Math.sin angle
 <circle cx="50" cy="50" r="2" class="text-yellow-darker fill-current" />
 ```
 
-## line
-```svg
-<line x1="50" y1="50" x2="{{ handX }}" y2="{{ handY }}" stroke="black" stroke-width="2" />
-```
-
 ## numbers
 ```svg
 <g class="text-yellow-darkest fill-current">
@@ -60,10 +55,15 @@ Math.sin angle
 </g>
 ```
 
+## line
+```svg
+<line x1="50" y1="50" x2="{{ handX }}" y2="{{ handY }}" stroke="black" stroke-width="2" />
+```
+
 ## clock
 ```svg
 {{ background }}
-{{ line }}
 {{ numbers }}
+{{ line }}
 ```
 """
