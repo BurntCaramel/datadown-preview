@@ -199,11 +199,11 @@ viewCodePreview language source =
             [ text (language |> Maybe.withDefault "none") ]
 
 
-viewCode : Maybe String -> String -> Html Message
-viewCode language source =
+viewCode : Bool -> Maybe String -> String -> Html Message
+viewCode compact language source =
     let
         codeHtmlList =
-            if showCodeForLanguage language then
+            if not compact && showCodeForLanguage language then
                 [ pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
                     [ code [ class "font-mono text-sm" ] [ text source ] ]
                 ]
@@ -214,14 +214,14 @@ viewCode language source =
             (codeHtmlList ++ viewCodePreview language source)
 
 
-viewContent : Content (Result Error (List (List Token))) -> Html Message
-viewContent content =
+viewContent : Bool -> Content (Result Error (List (List Token))) -> Html Message
+viewContent compact content =
     case content of
         Text s ->
             div [ class "font-sans w-full" ] [ text s ]
 
         Code language source ->
-            viewCode language source
+            viewCode compact language source
 
         Json json ->
             Preview.Json.viewJson json
@@ -236,14 +236,14 @@ viewContent content =
                         [ code [ class "font-mono text-sm" ] (List.map viewExpression expressions) ]
 
         List items ->
-            ul [] (List.map (\item -> li [] [ viewContent item ]) items)
+            ul [] (List.map (\item -> li [] [ viewContent compact item ]) items)
 
         Quote document ->
             pre [] [ code [] [ text "quoted document" ] ]
 
 
-viewSectionInner : Result e (Content (Result Error (List (List Token)))) -> Html Message
-viewSectionInner contentResult =
+viewContentResult : Bool -> Result e (Content (Result Error (List (List Token)))) -> Html Message
+viewContentResult compact contentResult =
     case contentResult of
         Err error ->
             case error of
@@ -251,7 +251,7 @@ viewSectionInner contentResult =
                     div [] [ text (toString error) ]
 
         Ok content ->
-            div [ class "mb-3" ] [ viewContent content ]
+            div [ class "mb-3" ] [ viewContent compact content ]
 
 
 type alias SectionViewModel e =
@@ -271,7 +271,7 @@ viewSection { title, resolvedContent, variables } =
     div []
         [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
         , resolvedContent
-            |> viewSectionInner
+            |> viewContentResult False
 
         -- , div [] [ text (variables |> toString) ]
         ]
@@ -284,23 +284,28 @@ view model =
         document =
             parseDocument parseExpressions model.input
 
-        resolvedContents =
+        resolved =
             processDocument (evaluateExpressions model) (contentToJson model) document
 
         sectionVariables =
             listVariablesInDocument document
 
         results =
-            List.map2 makeSectionViewModel resolvedContents sectionVariables
+            List.map2 makeSectionViewModel resolved.sections sectionVariables
 
         resultsEl =
             results
                 |> List.map viewSection
+        
+        introEl =
+            resolved.intro
+                |> viewContentResult True
     in
         div []
             [ div [ class "flex flex-wrap h-screen" ]
                 [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
                     [ h1 [ class "mb-4 text-3xl text-blue" ] [ text document.title ]
+                    , introEl
                     , div [] resultsEl
                     ]
                 , div [ class "flex-1 min-w-full md:min-w-0" ]

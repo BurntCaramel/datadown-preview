@@ -66,23 +66,24 @@ processContentBlock parseExpressions block =
 
 addContentToDocument : Content a -> List ( String, a ) -> Document a -> Document a
 addContentToDocument content expressions document =
-    let
-        newSections : List (Section a)
-        newSections =
-            case document.sections of
-                [] ->
-                    []
+    case document.sections of
+        [] ->
+            { document
+                | introContent = content :: document.introContent
+                , introInlineExpressions = Dict.union document.introInlineExpressions (Dict.fromList expressions)
+            }
 
-                section :: sectionsTail ->
+        section :: sectionsTail ->
+            let
+                newSection =
                     { section
                         | mainContent = Just content
                         , inlineExpressions = Dict.union section.inlineExpressions (Dict.fromList expressions)
                     }
-                        :: sectionsTail
-    in
-        { document
-            | sections = newSections
-        }
+            in
+                { document
+                    | sections = newSection :: sectionsTail
+                }
 
 
 sectionWithTitle : String -> Section a
@@ -172,6 +173,8 @@ processDocument parseExpressions blocks =
     let
         initialDocument =
             { title = ""
+            , introContent = []
+            , introInlineExpressions = Dict.empty
             , sections = []
             }
     in

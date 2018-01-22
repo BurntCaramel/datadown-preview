@@ -39,7 +39,8 @@ type Error e
 
 
 type alias Resolved e a =
-    { resolvedValues : Dict String (Result (Error e) (Content a))
+    { sections : List (String, (Result (Error e) (Content a)))
+    , intro: (Result (Error e) (Content a))
     , tests : List (Document a)
     }
 
@@ -143,8 +144,8 @@ processSection valueForIdentifier evaluateExpression section =
                 Err (NoContentForSection section.title)
 
 
-foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
-foldProcessedSections evaluateExpression contentToJson section prevResults =
+nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> Result (Error e) (Content a)
+nextProcessedSection evaluateExpression contentToJson section prevResults =
     let
         contentForKey : String -> Result (Error e) (Content a)
         contentForKey key =
@@ -162,21 +163,51 @@ foldProcessedSections evaluateExpression contentToJson section prevResults =
         valueForIdentifier key =
             contentForKey key
                 |> Result.andThen (contentToJson >> Result.mapError (always CannotConvertContent))
+    in
+        processSection valueForIdentifier evaluateExpression section
 
+
+foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
+foldProcessedSections evaluateExpression contentToJson section prevResults =
+    let
         result : Result (Error e) (Content a)
         result =
-            processSection valueForIdentifier evaluateExpression section
+            nextProcessedSection evaluateExpression contentToJson section prevResults
     in
         ( section.title, result ) :: prevResults
 
 
 {-| Process a document and return a result
 -}
-processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> List ( String, Result (Error e) (Content a) )
+processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Resolved e a
 processDocument evaluateExpression contentToJson document =
-    document.sections
-        |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []
-        |> List.reverse
+    let
+        resolvedSections =
+            document.sections
+                |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []
+                |> List.reverse
+                
+        resolvedIntro =
+            case document.introContent of
+                hd :: tail ->
+                    let
+                        introSection =
+                            { title = "intro"
+                            , mainContent = Just hd
+                            , secondaryContent = Dict.empty
+                            , inlineExpressions = document.introInlineExpressions
+                            }
+                    in
+                        nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
+
+                [] ->
+                    Err (NoContentForSection "intro")
+
+    in
+        { sections = resolvedSections
+        , intro = resolvedIntro
+        , tests = []
+        }
 
 
 listVariablesInSection : Section a -> ( String, List String )

@@ -4,7 +4,9 @@ module Samples.Clock
 source : String
 source = """# Clock
 
-[x] now
+```svg
+{{ clock }}
+```
 
 ## seconds
 ```
@@ -58,7 +60,7 @@ Math.sin angle
 </g>
 ```
 
-## Clock
+## clock
 ```svg
 {{ background }}
 {{ line }}

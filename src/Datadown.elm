@@ -43,5 +43,7 @@ type alias Section a =
 -}
 type alias Document a =
     { title : String
+    , introContent : List (Content a)
+    , introInlineExpressions : Dict String a
     , sections : List (Section a)
     }
