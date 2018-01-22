@@ -57,6 +57,12 @@ jsonToString json =
 
         JsonValue.NumericValue f ->
             toString f
+        
+        -- TODO: turn to real Markdown?
+        JsonValue.ArrayValue items ->
+            items
+                |> List.map (jsonToString >> String.append "- ")
+                |> String.join "\n"
 
         _ ->
             toString json
