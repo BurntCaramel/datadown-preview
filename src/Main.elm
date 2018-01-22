@@ -57,6 +57,12 @@ contentToJson model content =
 
                 _ ->
                     Err Evaluate.CannotConvertToJson
+        
+        List items ->
+            items
+                |> List.filterMap ((contentToJson model) >> Result.toMaybe)
+                |> JsonValue.ArrayValue
+                |> Ok
 
         _ ->
             Err Evaluate.CannotConvertToJson
