@@ -105,16 +105,12 @@ processSection valueForIdentifier evaluateExpression section =
         expressionForString : String -> Maybe a
         expressionForString s =
             section.inlineExpressions
-                |> Debug.log ("inlineExpressions a: " ++ (toString s))
                 |> Dict.get s
-                |> Debug.log "inlineExpressions b"
 
         resolveExpressionString : String -> Maybe JsonValue
         resolveExpressionString s =
             expressionForString s
-                |> Debug.log "expressionForString"
                 |> Maybe.andThen (evaluateExpression valueForIdentifier >> Result.toMaybe)
-                |> Debug.log ("resolve expression " ++ (toString s))
     in
         case section.mainContent of
             Just (Text text) ->
