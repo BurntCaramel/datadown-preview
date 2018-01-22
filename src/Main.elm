@@ -3,12 +3,10 @@ module Main exposing (main)
 import Html exposing (..)
 import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
-import Svg
+import Time exposing (Time)
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process exposing (processDocument, listVariablesInDocument)
-import HtmlParser
-import HtmlParser.Util
 import Parser exposing (Error)
 import Preview.Json
 import Preview.Html
@@ -72,11 +70,6 @@ stringForContent content =
             Nothing
 
 
-type alias Model =
-    { input : String
-    }
-
-
 defaultInput : String
 defaultInput =
     """
@@ -108,21 +101,41 @@ Doe
 """ |> String.trim
 
 
-model : Model
-model =
-    { input = defaultInput
+type alias Model =
+    { input : String
+    , now: Time
     }
+
+
+init : ( Model, Cmd Message )
+init =
+    { input = defaultInput
+    , now = 0
+    }
+        ! [ Cmd.none
+          ]
 
 
 type Message
     = ChangeInput String
+    | Time Time
 
 
-update : Message -> Model -> Model
+update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     case msg of
         ChangeInput newInput ->
-            { model | input = newInput }
+            ( { model | input = newInput }, Cmd.none )
+        
+        Time time ->
+            ( { model | now = time }, Cmd.none )
+
+
+subscriptions : Model -> Sub Message
+subscriptions model =
+    Sub.batch
+        [ Time.every Time.second Time
+        ]
 
 
 viewExpressionToken : Token -> Html Message
@@ -284,8 +297,9 @@ view model =
 
 main : Program Never Model Message
 main =
-    beginnerProgram
-        { model = model
+    program
+        { init = init
         , view = view
         , update = update
+        , subscriptions = subscriptions
         }
