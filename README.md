@@ -1,5 +1,7 @@
 # Datadown Preview
 
-- Preview datadown documents
-- Create components and templates
-- Easily write inline unit tests
+- Work with numbers, text, and lists
+- Render SVG and HTML
+- Export components and templates
+- Free documentation: you wrote Markdown!
+- Write inline unit-tests easily
