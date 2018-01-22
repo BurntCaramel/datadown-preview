@@ -63,6 +63,9 @@ jsonToString json =
             items
                 |> List.map (jsonToString >> String.append "- ")
                 |> String.join "\n"
+        
+        JsonValue.BoolValue bool ->
+            if bool then "👍" else "👎"
 
         _ ->
             toString json

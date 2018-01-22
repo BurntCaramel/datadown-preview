@@ -4,7 +4,7 @@ module Expressions.Evaluate
         , Error(..)
         )
 
-import Expressions.Tokenize exposing (Operator(..), Token(..))
+import Expressions.Tokenize exposing (Operator(..), Token(..), MathFunction(..))
 import JsonValue exposing (JsonValue(..))
 
 
@@ -28,11 +28,8 @@ identityForOperator op =
         Subtract ->
             Just <| NumericValue 0
 
-        Multiply ->
-            Just <| NumericValue 1
-
         _ ->
-            Nothing
+            Just <| NumericValue 1
 
 
 toFloat : JsonValue -> Maybe Float
@@ -121,6 +118,28 @@ processOperator op a b =
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
+        
+        Math function ->
+            case ( a, b ) of
+                ( NumericValue a, NumericValue b ) ->
+                    Ok <| NumericValue <|
+                        case function of
+                            Sine ->
+                                a * (sin b)
+
+                            Cosine ->
+                                a * (cos b)
+                            
+                            Tangent ->
+                                a * (tan b)
+                            
+                            Turns ->
+                                a * (turns b)
+
+
+                _ ->
+                    Err <| InvalidValuesForOperator op a b
+
 
 
 valueOperatorOnList : Operator -> JsonValue -> List JsonValue -> Result Error JsonValue

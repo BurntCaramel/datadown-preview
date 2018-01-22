@@ -4,6 +4,7 @@ import Html exposing (..)
 import Html.Attributes exposing (class, rows)
 import Html.Events exposing (onInput)
 import Time exposing (Time)
+import Date
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, listVariablesInDocument, Error)
@@ -13,6 +14,7 @@ import Preview.Json
 import Preview.Html
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
+import Samples.Clock
 
 
 type Error
@@ -31,14 +33,59 @@ parseExpressions input =
             Ok tokens
 
 
-evaluateExpressions : (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
-evaluateExpressions resolveIdentifier parsedExpressions =
+valueFromModel : Model -> String -> Maybe JsonValue
+valueFromModel model key =
+    case key of
+        "now.seconds" ->
+            model.now
+                |> Time.inSeconds
+                |> floor
+                |> toFloat
+                |> JsonValue.NumericValue >> Just
+        
+        "now.date.s" ->
+            model.now
+                |> Date.fromTime
+                |> Date.second
+                |> toFloat
+                |> JsonValue.NumericValue >> Just
+        
+        "now.date.m" ->
+            model.now
+                |> Date.fromTime
+                |> Date.minute
+                |> toFloat
+                |> JsonValue.NumericValue >> Just
+        
+        "now.date.h" ->
+            model.now
+                |> Date.fromTime
+                |> Date.hour
+                |> toFloat
+                |> JsonValue.NumericValue >> Just
+        
+        _ ->
+            Nothing
+
+
+evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
+evaluateExpressions model resolveFromDocument parsedExpressions =
+    let
+        resolveWithModel key =
+            case valueFromModel model key of
+                Just value ->
+                    Ok value
+                
+                Nothing ->
+                    resolveFromDocument key
+    in
+        
     case parsedExpressions of
         Err error ->
             Err Evaluate.Parsing
 
         Ok expressions ->
-            evaulateTokenLines resolveIdentifier expressions
+            evaulateTokenLines resolveWithModel expressions
 
 
 contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
@@ -63,40 +110,12 @@ contentToJson model content =
                 |> List.filterMap ((contentToJson model) >> Result.toMaybe)
                 |> JsonValue.ArrayValue
                 |> Ok
+        
+        Code maybeLanguage source ->
+            Ok <| JsonValue.StringValue <| String.trim source
 
         _ ->
             Err Evaluate.CannotConvertToJson
-
-
-defaultInput : String
-defaultInput =
-    """
-# Welcome screen
-
-## firstName
-Jane
-
-## lastName
-Doe
-
-## fullName
-{{ firstName }} {{ lastName }}
-
-## data
-```json
-{ "firstName": "{{ firstName }}", "name": "Doe", "items": ["first", { "nested": true }] }
-```
-
-## Header
-```html
-<h1>Welcome, {{ fullName }}!</h1>
-```
-
-## svg
-```svg
-<rect width="100" height="100" fill="red"></rect>
-```
-""" |> String.trim
 
 
 type alias Model =
@@ -107,7 +126,7 @@ type alias Model =
 
 init : ( Model, Cmd Message )
 init =
-    { input = defaultInput
+    { input = Samples.Clock.source
     , now = 0
     }
         ! [ Cmd.none
@@ -132,7 +151,7 @@ update msg model =
 subscriptions : Model -> Sub Message
 subscriptions model =
     Sub.batch
-        [--Time.every Time.second Time
+        [ Time.every Time.second Time
         ]
 
 
@@ -266,7 +285,7 @@ view model =
             parseDocument parseExpressions model.input
 
         resolvedContents =
-            processDocument evaluateExpressions (contentToJson model) document
+            processDocument (evaluateExpressions model) (contentToJson model) document
 
         sectionVariables =
             listVariablesInDocument document

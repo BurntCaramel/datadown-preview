@@ -8,6 +8,7 @@ module Expressions.Tokenize
         , tokenize
         , Token(..)
         , Operator(..)
+        , MathFunction(..)
         )
 
 {-| Tokenize
@@ -31,6 +32,13 @@ import Set
 import JsonValue exposing (JsonValue(..))
 
 
+type MathFunction
+    = Sine
+    | Cosine
+    | Tangent
+    | Turns
+
+
 type Operator
     = Add
     | Subtract
@@ -40,6 +48,7 @@ type Operator
     | EqualTo
     | LessThan Bool
     | GreaterThan Bool
+    | Math MathFunction
 
 
 type Token
@@ -48,11 +57,30 @@ type Token
     | Operator Operator
 
 
+-- type Type
+--     = Float
+--     | String
+--     | Bool
+--     | Unknown
+
+
+-- type Expression t
+--     = Get String t
+--     | Use JsonValue
+--     | Comparison Operator (Expression Unknown) (Expression Unknown)
+--     | Math Float Operator (List (Expression Float))
+--     | MathFunction String (Expression Float)
+--     | If (Expression Bool) (Expression t) (Expression t)
+
+
 isIdentifierTailChar : Char -> Bool
 isIdentifierTailChar c =
     Char.isLower c
         || Char.isUpper c
         || Char.isDigit c
+        || c == '.'
+        || c == '_'
+        
 
 
 identifier : Parser Token
@@ -84,6 +112,14 @@ operator =
             |. symbol ">="
         , succeed (GreaterThan False)
             |. symbol ">"
+        , succeed (Math Sine)
+            |. keyword "Math.sin"
+        , succeed (Math Cosine)
+            |. keyword "Math.cos"
+        , succeed (Math Tangent)
+            |. keyword "Math.tan"
+        , succeed (Math Turns)
+            |. keyword "Math.turns"
         ]
 
 
