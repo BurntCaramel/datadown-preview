@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Html exposing (..)
-import Html.Attributes exposing (class, rows)
+import Html.Attributes exposing (class, rows, attribute)
 import Html.Events exposing (onInput)
 import Time exposing (Time)
 import Date
@@ -268,8 +268,10 @@ makeSectionViewModel ( title, resolvedContent ) ( _, variables ) =
 
 viewSection : SectionViewModel e -> Html Message
 viewSection { title, resolvedContent, variables } =
-    div []
-        [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
+    details [ attribute "open" "" ]
+        [ summary []
+            [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
+            ]
         , resolvedContent
             |> viewContentResult False
 
