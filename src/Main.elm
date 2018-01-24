@@ -17,6 +17,12 @@ import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
 import Samples.Clock
 
 
+type alias Model =
+    { input : String
+    , now : Time
+    }
+
+
 type Error
     = Parser Parser.Error
     | Evaluate Evaluate.Error
@@ -116,12 +122,6 @@ contentToJson model content =
 
         _ ->
             Err Evaluate.CannotConvertToJson
-
-
-type alias Model =
-    { input : String
-    , now : Time
-    }
 
 
 init : ( Model, Cmd Message )
