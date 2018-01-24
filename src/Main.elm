@@ -1,8 +1,8 @@
 module Main exposing (main)
 
 import Html exposing (..)
-import Html.Attributes exposing (class, rows, attribute)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (class, rows, attribute, value)
+import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
 import Array exposing (Array)
@@ -128,7 +128,8 @@ contentToJson model content =
 
 init : ( Model, Cmd Message )
 init =
-    { documentSources = [ Samples.Clock.source ]
+    { documentSources =
+        [ "# First", Samples.Clock.source, "# Third" ]
         |> Array.fromList
     , currentDocumentIndex = 0
     , now = 0
@@ -138,20 +139,39 @@ init =
 
 
 type Message
-    = ChangeInput String
+    = ChangeDocumentSource String
+    | GoToPreviousDocument
+    | GoToNextDocument
     | Time Time
 
 
 update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     case msg of
-        ChangeInput newInput ->
+        ChangeDocumentSource newInput ->
             let
                 documentSources =
                     model.documentSources
                         |> Array.set model.currentDocumentIndex newInput
             in
                 ( { model | documentSources = documentSources }, Cmd.none )
+        
+        GoToPreviousDocument ->
+            let
+                newIndex =
+                    max 0 (model.currentDocumentIndex - 1)
+            in
+                ( { model | currentDocumentIndex = newIndex }, Cmd.none )
+        
+        GoToNextDocument ->
+            let
+                maxIndex =
+                    Array.length model.documentSources - 1
+
+                newIndex =
+                    min maxIndex (model.currentDocumentIndex + 1)
+            in
+                ( { model | currentDocumentIndex = newIndex }, Cmd.none )
 
         Time time ->
             ( { model | now = time }, Cmd.none )
@@ -326,7 +346,7 @@ viewDocumentSource model documentSource =
                 , div [] resultsEl
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text documentSource ]
+                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20 ] []
                 ]
             ]
 
@@ -338,7 +358,11 @@ view model =
             Array.get model.currentDocumentIndex model.documentSources
     in
         div []
-            [ case documentSourceMaybe of
+            [ div []
+                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-lg text-purple-dark bg-purple-lightest" ] [ text "<" ]
+                , button [ onClick GoToNextDocument, class "px-2 py-1 text-lg text-purple-dark bg-purple-lightest" ] [ text ">" ]
+                ]
+            , case documentSourceMaybe of
                 Just documentSource ->
                     viewDocumentSource model documentSource
                 
