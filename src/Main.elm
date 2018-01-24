@@ -5,6 +5,7 @@ import Html.Attributes exposing (class, rows, attribute)
 import Html.Events exposing (onInput)
 import Time exposing (Time)
 import Date
+import Array exposing (Array)
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, listVariablesInDocument, Error)
@@ -18,7 +19,8 @@ import Samples.Clock
 
 
 type alias Model =
-    { input : String
+    { documentSources : Array String
+    , currentDocumentIndex : Int
     , now : Time
     }
 
@@ -126,7 +128,9 @@ contentToJson model content =
 
 init : ( Model, Cmd Message )
 init =
-    { input = Samples.Clock.source
+    { documentSources = [ Samples.Clock.source ]
+        |> Array.fromList
+    , currentDocumentIndex = 0
     , now = 0
     }
         ! [ Cmd.none
@@ -142,7 +146,12 @@ update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     case msg of
         ChangeInput newInput ->
-            ( { model | input = newInput }, Cmd.none )
+            let
+                documentSources =
+                    model.documentSources
+                        |> Array.set model.currentDocumentIndex newInput
+            in
+                ( { model | documentSources = documentSources }, Cmd.none )
 
         Time time ->
             ( { model | now = time }, Cmd.none )
@@ -279,12 +288,12 @@ viewSection { title, resolvedContent, variables } =
         ]
 
 
-view : Model -> Html Message
-view model =
+viewDocumentSource : Model -> String -> Html Message
+viewDocumentSource model documentSource =
     let
         document : Document (Result Error (List (List Token)))
         document =
-            parseDocument parseExpressions model.input
+            parseDocument parseExpressions documentSource
 
         resolved =
             processDocument (evaluateExpressions model) (contentToJson model) document
@@ -310,17 +319,32 @@ view model =
                 Err error ->
                     div [] [ text <| toString error ]
     in
-        div []
-            [ div [ class "flex flex-wrap h-screen" ]
-                [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
-                    [ h1 [ class "mb-4 text-3xl text-blue" ] [ text document.title ]
-                    , introEl
-                    , div [] resultsEl
-                    ]
-                , div [ class "flex-1 min-w-full md:min-w-0" ]
-                    [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text model.input ]
-                    ]
+        div [ class "flex flex-wrap h-screen" ]
+            [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
+                [ h1 [ class "mb-4 text-3xl text-blue" ] [ text document.title ]
+                , introEl
+                , div [] resultsEl
                 ]
+            , div [ class "flex-1 min-w-full md:min-w-0" ]
+                [ textarea [ class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20, onInput ChangeInput ] [ text documentSource ]
+                ]
+            ]
+
+
+view : Model -> Html Message
+view model =
+    let
+        documentSourceMaybe =
+            Array.get model.currentDocumentIndex model.documentSources
+    in
+        div []
+            [ case documentSourceMaybe of
+                Just documentSource ->
+                    viewDocumentSource model documentSource
+                
+                Nothing ->
+                    div [] [ text "No documnet" ]
+
             , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
                 [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit" ]
                 , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test" ]
