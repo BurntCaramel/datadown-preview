@@ -21,8 +21,14 @@ import Samples.Clock
 type alias Model =
     { documentSources : Array String
     , currentDocumentIndex : Int
+    , nav : Nav
     , now : Time
     }
+
+
+type Nav
+    = DocumentsList
+    | Document Int
 
 
 type Error
@@ -132,6 +138,7 @@ init =
         [ "# First", Samples.Clock.source, "# Third" ]
         |> Array.fromList
     , currentDocumentIndex = 0
+    , nav = Document 0
     , now = 0
     }
         ! [ Cmd.none
@@ -140,8 +147,10 @@ init =
 
 type Message
     = ChangeDocumentSource String
+    | GoToDocumentsList
     | GoToPreviousDocument
     | GoToNextDocument
+    | GoToDocumentAtIndex Int
     | NewDocument
     | Time Time
 
@@ -157,34 +166,58 @@ update msg model =
             in
                 ( { model | documentSources = documentSources }, Cmd.none )
         
+        GoToDocumentsList ->
+            ( { model | nav = DocumentsList }, Cmd.none )
+        
         GoToPreviousDocument ->
             let
                 newIndex =
-                    max 0 (model.currentDocumentIndex - 1)
+                    case model.nav of
+                        DocumentsList ->
+                            0
+                        
+                        Document index ->
+                            max 0 (index - 1)
             in
-                ( { model | currentDocumentIndex = newIndex }, Cmd.none )
+                ( { model | nav = Document newIndex }, Cmd.none )
         
         GoToNextDocument ->
             let
                 maxIndex =
                     Array.length model.documentSources - 1
-
+                
                 newIndex =
-                    min maxIndex (model.currentDocumentIndex + 1)
+                    case model.nav of
+                        DocumentsList ->
+                            maxIndex
+                        
+                        Document index ->
+                            min maxIndex (index + 1)
             in
-                ( { model | currentDocumentIndex = newIndex }, Cmd.none )
+                ( { model | nav = Document newIndex }, Cmd.none )
+        
+        GoToDocumentAtIndex index ->
+            ( { model | nav = Document index }, Cmd.none )
         
         NewDocument ->
             let
+                currentIndex =
+                    case model.nav of
+                        DocumentsList ->
+                            0
+                        
+                        Document index ->
+                            index
+
                 newDocumentSource =
                     "# Untitled"
 
                 prefix =
-                    Array.slice 0 model.currentDocumentIndex model.documentSources
+                    Array.slice 0 currentIndex model.documentSources
                         |> Array.push newDocumentSource
                 
                 suffix =
-                    Array.slice model.currentDocumentIndex (Array.length model.documentSources) model.documentSources
+                    Array.slice currentIndex (Array.length model.documentSources) model.documentSources
                 
                 documentSources =
                     Array.append prefix suffix
@@ -334,11 +367,38 @@ viewFontAwesomeIcon id =
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
     div []
-        [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ]
-        , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
-        , div [ class "inline-block w-3 py-1 text-center font-bold text-purple-dark bg-purple-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
-        , button [ onClick GoToNextDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
-        ]
+        ([ [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ] ]
+        , case model.nav of
+            DocumentsList ->
+                [
+                -- button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-lightest bg-purple-dark" ] [ viewFontAwesomeIcon "bars" ]
+                ]
+            
+            Document index ->
+                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
+                , div [ class "inline-block w-3 py-1 text-center font-bold text-purple-dark bg-purple-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
+                , button [ onClick GoToNextDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
+                , button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "bars" ]
+                ]
+        ] |> List.concat)
+
+
+viewDocuments : Model -> Html Message
+viewDocuments model =
+    let
+        viewDocument index documentSource =
+            let
+                document =
+                    parseDocument parseExpressions documentSource
+            in
+                h2 [ class "mb-4" ]
+                    [ button [ class "text-3xl font-bold text-blue", onClick (GoToDocumentAtIndex index) ] [ text document.title ] ]
+    in
+        div [ class "p-4" ]
+            [ viewDocumentNavigation model
+            , div [ class "mt-4" ]
+                (Array.indexedMap viewDocument model.documentSources |> Array.toList)
+            ]
 
 
 viewDocumentSource : Model -> String -> Html Message
@@ -394,13 +454,14 @@ view model =
             Array.get model.currentDocumentIndex model.documentSources
     in
         div []
-            [ case documentSourceMaybe of
-                Just documentSource ->
-                    viewDocumentSource model documentSource
+            [ case model.nav of
+                DocumentsList ->
+                    viewDocuments model
                 
-                Nothing ->
-                    div [] [ text "No documnet" ]
-
+                Document index ->
+                    Array.get index model.documentSources
+                        |> Maybe.map (viewDocumentSource model)
+                        |> Maybe.withDefault (div [] [ text "No document" ])
             , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
                 [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit" ]
                 , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test" ]
