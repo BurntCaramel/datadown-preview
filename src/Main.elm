@@ -142,6 +142,7 @@ type Message
     = ChangeDocumentSource String
     | GoToPreviousDocument
     | GoToNextDocument
+    | NewDocument
     | Time Time
 
 
@@ -172,6 +173,23 @@ update msg model =
                     min maxIndex (model.currentDocumentIndex + 1)
             in
                 ( { model | currentDocumentIndex = newIndex }, Cmd.none )
+        
+        NewDocument ->
+            let
+                newDocumentSource =
+                    "# Untitled"
+
+                prefix =
+                    Array.slice 0 model.currentDocumentIndex model.documentSources
+                        |> Array.push newDocumentSource
+                
+                suffix =
+                    Array.slice model.currentDocumentIndex (Array.length model.documentSources) model.documentSources
+                
+                documentSources =
+                    Array.append prefix suffix
+            in
+                ( { model | documentSources = documentSources }, Cmd.none )
 
         Time time ->
             ( { model | now = time }, Cmd.none )
@@ -308,6 +326,21 @@ viewSection { title, resolvedContent, variables } =
         ]
 
 
+viewFontAwesomeIcon : String -> Html Message
+viewFontAwesomeIcon id =
+    i [ class ("fas fa-" ++ id) ] []
+
+
+viewDocumentNavigation : Model -> Html Message
+viewDocumentNavigation model =
+    div []
+        [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ]
+        , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
+        , div [ class "inline-block w-3 py-1 text-center font-bold text-purple-dark bg-purple-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
+        , button [ onClick GoToNextDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
+        ]
+
+
 viewDocumentSource : Model -> String -> Html Message
 viewDocumentSource model documentSource =
     let
@@ -341,7 +374,10 @@ viewDocumentSource model documentSource =
     in
         div [ class "flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
-                [ h1 [ class "mb-4 text-3xl text-blue" ] [ text document.title ]
+                [ div [ class "flex" ]
+                    [ h1 [ class "flex-1 mb-4 text-3xl text-blue" ] [ text document.title ]
+                    , viewDocumentNavigation model
+                    ]
                 , introEl
                 , div [] resultsEl
                 ]
@@ -358,11 +394,7 @@ view model =
             Array.get model.currentDocumentIndex model.documentSources
     in
         div []
-            [ div []
-                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-lg text-purple-dark bg-purple-lightest" ] [ text "<" ]
-                , button [ onClick GoToNextDocument, class "px-2 py-1 text-lg text-purple-dark bg-purple-lightest" ] [ text ">" ]
-                ]
-            , case documentSourceMaybe of
+            [ case documentSourceMaybe of
                 Just documentSource ->
                     viewDocumentSource model documentSource
                 
