@@ -401,12 +401,30 @@ viewDocuments model =
     let
         viewDocument index documentSource =
             let
+                firstLine =
+                    documentSource
+                        |> String.trim
+                        |> String.lines
+                        |> List.head
+                
+                maybeTitle =
+                    Maybe.map (parseDocument parseExpressions >> .title) firstLine
+                        |> Maybe.andThen (\line -> if String.isEmpty line then Nothing else Just line)
+                
+                titleHtml =
+                    case maybeTitle of
+                        Just input ->
+                            text input
+                        
+                        Nothing ->
+                            em [] [ text "Untitled" ]
+
                 document =
                     parseDocument parseExpressions documentSource
             in
                 h2 [ class "" ]
                     [ button [ class "w-full px-4 py-2 text-left text-3xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
-                        [ text document.title ]
+                        [ titleHtml ]
                     ]
     in
         div [ class "flex-1" ]
