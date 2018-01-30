@@ -62,7 +62,7 @@ jsonToString json =
         -- TODO: turn to real Markdown?
         JsonValue.ArrayValue items ->
             items
-                |> List.map (jsonToString >> String.append "- ")
+                |> List.map jsonToString
                 |> String.join "\n"
         
         JsonValue.BoolValue bool ->
