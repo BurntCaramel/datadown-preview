@@ -491,11 +491,11 @@ view model =
                 Array.get index model.documentSources
                     |> Maybe.map (viewDocumentSource model)
                     |> Maybe.withDefault (div [] [ text "No document" ])
-        , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
-            [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit" ]
-            , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test" ]
-            , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Export" ]
-            ]
+        -- , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
+        --     [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit" ]
+        --     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test" ]
+        --     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Export" ]
+        --     ]
         ]
 
 
