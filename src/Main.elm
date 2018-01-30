@@ -427,7 +427,7 @@ viewDocuments model =
                         [ titleHtml ]
                     ]
     in
-        div [ class "flex-1" ]
+        div [ class "max-w-lg mx-auto flex-1" ]
             [ div [ class "p-4" ] [ viewDocumentNavigation model ]
             , div [ class "border-t border-blue-lighter" ]
                 (Array.indexedMap viewDocument model.documentSources |> Array.toList)
