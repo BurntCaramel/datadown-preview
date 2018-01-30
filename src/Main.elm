@@ -354,7 +354,7 @@ viewSection : SectionViewModel e -> Html Message
 viewSection { title, resolvedContent, variables } =
     details [ attribute "open" "" ]
         [ summary []
-            [ h2 [ class "text-xl text-blue-dark" ] [ text title ]
+            [ h2 [ class "mb-2 text-xl text-blue-dark" ] [ text title ]
             ]
         , resolvedContent
             |> viewContentResult False
@@ -378,10 +378,10 @@ viewDocumentNavigation model =
                 ]
             
             Document index ->
-                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
-                , div [ class "inline-block w-3 py-1 text-center font-bold text-purple-dark bg-purple-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
-                , button [ onClick GoToNextDocument, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
-                , button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ viewFontAwesomeIcon "bars" ]
+                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
+                , div [ class "inline-block w-3 py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
+                , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
+                , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
                 ]
         ] |> List.concat)
 
