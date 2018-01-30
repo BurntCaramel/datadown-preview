@@ -20,4 +20,13 @@ Edit live. No installation or config. Mobile friendly. Upcoming support for mult
 </text>
 </svg>
 ```
+
+## why.svg
+```svg
+<svg width="100%">
+<text x="10" y="50" font-size="1.8rem" fill="#d6b" stroke="#a29" stroke-dasharray="6 2">
+{{ why }}
+</text>
+</svg>
+```
 """

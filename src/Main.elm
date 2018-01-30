@@ -286,16 +286,21 @@ viewCodePreview language source =
 viewCode : Bool -> Maybe String -> String -> Html Message
 viewCode compact language source =
     let
-        codeHtmlList =
-            if not compact && showCodeForLanguage language then
-                [ pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
-                    [ code [ class "font-mono text-sm" ] [ text source ] ]
-                ]
-            else
-                []
+        previewHtml =
+            div [] (viewCodePreview language source)
     in
-        div []
-            (codeHtmlList ++ viewCodePreview language source)
+        if not compact && showCodeForLanguage language then
+            div []
+                [ previewHtml
+                , details [] 
+                    [ summary [ class "px-2 py-1 font-mono text-xs text-purple-darker bg-purple-lightest" ]
+                        [ text "Source" ]
+                    , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
+                        [ code [ class "font-mono text-xs" ] [ text source ] ]
+                    ]
+                ]
+        else
+            div [] [ previewHtml ]
 
 
 viewContent : Bool -> Content (Result Error (List (List Token))) -> Html Message
@@ -445,7 +450,7 @@ viewDocumentSource model documentSource =
                 , div [] resultsEl
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darkest bg-blue-lightest", rows 20 ] []
+                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darker bg-blue-lightest", rows 20 ] []
                 ]
             ]
 
