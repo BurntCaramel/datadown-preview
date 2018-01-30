@@ -15,6 +15,7 @@ import Preview.Json
 import Preview.Html
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
+import Samples.Welcome
 import Samples.Clock
 
 
@@ -135,8 +136,11 @@ contentToJson model content =
 init : ( Model, Cmd Message )
 init =
     { documentSources =
-        [ "# First", Samples.Clock.source, "# Third" ]
-        |> Array.fromList
+        [ Samples.Welcome.source
+        , Samples.Clock.source
+        , "# Now your turn!"
+        ]
+            |> Array.fromList
     , currentDocumentIndex = 0
     , nav = Document 0
     , now = 0
