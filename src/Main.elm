@@ -381,9 +381,7 @@ viewDocumentNavigation model =
     div []
         ([ case model.nav of
             DocumentsList ->
-                [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border-1 border-green-dark" ] [ viewFontAwesomeIcon "plus" ]
-                , div [] [ text "Documents" ]
-                -- button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-lightest bg-purple-dark" ] [ viewFontAwesomeIcon "bars" ]
+                [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border-1 border-green-dark" ] [ viewFontAwesomeIcon "plus", text " New" ]
                 ]
             
             Document index ->
