@@ -295,7 +295,7 @@ viewCode compact language source =
         if not compact && showCodeForLanguage language then
             div []
                 [ previewHtml
-                , details [] 
+                , details [ class "mt-2" ] 
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
                         [ text "Source" ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
