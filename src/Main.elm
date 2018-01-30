@@ -165,8 +165,13 @@ update msg model =
         ChangeDocumentSource newInput ->
             let
                 documentSources =
-                    model.documentSources
-                        |> Array.set model.currentDocumentIndex newInput
+                    case model.nav of
+                        Document index ->
+                            model.documentSources
+                                |> Array.set index newInput
+                    
+                        _ ->
+                            model.documentSources
             in
                 ( { model | documentSources = documentSources }, Cmd.none )
         
