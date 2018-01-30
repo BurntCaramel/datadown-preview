@@ -334,13 +334,16 @@ viewContent compact content =
             pre [] [ code [] [ text "quoted document" ] ]
 
 
-viewContentResult : Bool -> Result e (Content (Result Error (List (List Token)))) -> Html Message
+viewContentResult : Bool -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
 viewContentResult compact contentResult =
     case contentResult of
         Err error ->
             case error of
+                Process.NoContentForSection name ->
+                    div [ class "mb-3" ] [ em [] [ text "(No content)" ] ]
+
                 _ ->
-                    div [] [ text (toString error) ]
+                    div [ class "mb-3" ] [ text (toString error) ]
 
         Ok content ->
             div [ class "mb-3" ] [ viewContent compact content ]
@@ -358,7 +361,7 @@ makeSectionViewModel ( title, resolvedContent ) ( _, variables ) =
     SectionViewModel title resolvedContent variables
 
 
-viewSection : SectionViewModel e -> Html Message
+viewSection : SectionViewModel (Process.Error Evaluate.Error) -> Html Message
 viewSection { title, resolvedContent, variables } =
     details [ attribute "open" "" ]
         [ summary []
@@ -463,10 +466,10 @@ viewDocumentSource model documentSource =
                     text ""
 
                 Err error ->
-                    div [] [ text <| toString error ]
+                    div [ class "mb-3" ] [ text <| toString error ]
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
-            [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
+            [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
                 [ div [ class "flex mb-4" ]
                     [ h1 [ class "flex-1 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
@@ -475,7 +478,7 @@ viewDocumentSource model documentSource =
                 , div [] resultsEl
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm text-blue-darker bg-blue-lightest", rows 20 ] []
+                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
                 ]
             ]
 
