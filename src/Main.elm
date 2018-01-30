@@ -379,7 +379,7 @@ viewDocumentNavigation model =
             
             Document index ->
                 [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
-                , div [ class "inline-block w-3 py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (model.currentDocumentIndex + 1 |> toString) ]
+                , div [ class "inline-block w-3 py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (index + 1 |> toString) ]
                 , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
                 , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
                 ]
