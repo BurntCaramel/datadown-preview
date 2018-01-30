@@ -296,7 +296,7 @@ viewCode compact language source =
             div []
                 [ previewHtml
                 , details [] 
-                    [ summary [ class "px-2 py-1 font-mono text-xs text-purple-darker bg-purple-lightest" ]
+                    [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
                         [ text "Source" ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
                         [ code [ class "font-mono text-xs" ] [ text source ] ]
@@ -381,7 +381,8 @@ viewDocumentNavigation model =
     div []
         ([ case model.nav of
             DocumentsList ->
-                [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ]
+                [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border-1 border-green-dark" ] [ viewFontAwesomeIcon "plus" ]
+                , div [] [ text "Documents" ]
                 -- button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-lightest bg-purple-dark" ] [ viewFontAwesomeIcon "bars" ]
                 ]
             
@@ -402,8 +403,10 @@ viewDocuments model =
                 document =
                     parseDocument parseExpressions documentSource
             in
-                h2 [ class "mb-4" ]
-                    [ button [ class "text-3xl font-bold text-blue", onClick (GoToDocumentAtIndex index) ] [ text document.title ] ]
+                h2 [ class "mb-2" ]
+                    [ button [ class "w-full px-2 py-2 text-left text-3xl font-bold text-blue bg-blue-lightest rounded", onClick (GoToDocumentAtIndex index) ]
+                        [ text document.title ]
+                    ]
     in
         div [ class "p-4" ]
             [ viewDocumentNavigation model
