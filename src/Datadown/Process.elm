@@ -36,6 +36,7 @@ type Error e
     | Evaluate e
     | EvaluatingExpression String e
     | UnknownExpression
+    | Multiple (List (Error e))
 
 
 type alias Resolved e a =
@@ -121,27 +122,63 @@ processSection valueForIdentifier evaluateExpression section =
         resolveExpressionString s =
             expressionForString s
                 |> Maybe.andThen (evaluateExpression valueForIdentifier >> Result.toMaybe)
+        
+        processContent content =
+            case content of
+                Text text ->
+                    Ok (Text (mustache resolveExpressionString text))
+
+                List contentItems ->
+                    -- Ok (List contentItems)
+                    let
+                        reduceItem item result =
+                            case result of
+                                Ok items ->
+                                    case processContent item of
+                                        Ok processedItem ->
+                                            Ok (processedItem :: items)
+                                        
+                                        Err error ->
+                                            Err error
+
+                                Err error ->
+                                    Err error
+                        
+                        processedItems =
+                            contentItems
+                                |> List.foldl reduceItem (Ok [])
+                                |> Result.map List.reverse
+                    in
+                        case processedItems of
+                            Ok items ->
+                                Ok (List items)
+                            
+                            Err error ->
+                                Err error
+
+                Code language codeText ->
+                    Ok (Code language (mustache resolveExpressionString codeText))
+
+                Expressions input ->
+                    case evaluateExpression valueForIdentifier input of
+                        Ok json ->
+                            Ok (Json json)
+
+                        Err error ->
+                            Err (Evaluate error)
+
+                content ->
+                    Ok content
+        
+        processMaybeContent maybeContent =
+            case maybeContent of
+                Just content ->
+                    processContent content
+
+                Nothing ->
+                    Err (NoContentForSection section.title)
     in
-        case section.mainContent of
-            Just (Text text) ->
-                Ok (Text (mustache resolveExpressionString text))
-
-            Just (Code language codeText) ->
-                Ok (Code language (mustache resolveExpressionString codeText))
-
-            Just (Expressions input) ->
-                case evaluateExpression valueForIdentifier input of
-                    Ok json ->
-                        Ok (Json json)
-
-                    Err error ->
-                        Err (Evaluate error)
-
-            Just content ->
-                Ok content
-
-            Nothing ->
-                Err (NoContentForSection section.title)
+        processMaybeContent section.mainContent
 
 
 nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> Result (Error e) (Content a)
