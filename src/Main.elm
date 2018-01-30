@@ -378,19 +378,22 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div []
-        ([ case model.nav of
+    div [ class "" ]
+        [ case model.nav of
             DocumentsList ->
-                [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border-1 border-green-dark" ] [ viewFontAwesomeIcon "plus", text " New" ]
-                ]
+                div [ class "flex justify-between" ]
+                    [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border border-green-lighter rounded-sm" ] [ viewFontAwesomeIcon "plus", text " New" ]
+                    , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
+                    ]
             
             Document index ->
-                [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
-                , div [ class "inline-block w-3 py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (index + 1 |> toString) ]
-                , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
-                , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
-                ]
-        ] |> List.concat)
+                div [ class "self-end flex-shrink flex items-center border border-green-lighter rounded-sm" ]
+                    [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
+                    , div [ class "py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (index + 1 |> toString) ]
+                    , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
+                    , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
+                    ]
+        ]
 
 
 viewDocuments : Model -> Html Message
@@ -401,14 +404,14 @@ viewDocuments model =
                 document =
                     parseDocument parseExpressions documentSource
             in
-                h2 [ class "mb-2" ]
-                    [ button [ class "w-full px-2 py-2 text-left text-3xl font-bold text-blue bg-blue-lightest rounded", onClick (GoToDocumentAtIndex index) ]
+                h2 [ class "" ]
+                    [ button [ class "w-full px-4 py-2 text-left text-3xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
                         [ text document.title ]
                     ]
     in
-        div [ class "p-4" ]
-            [ viewDocumentNavigation model
-            , div [ class "mt-4" ]
+        div [ class "flex-1" ]
+            [ div [ class "p-4" ] [ viewDocumentNavigation model ]
+            , div [ class "border-t border-blue-lighter" ]
                 (Array.indexedMap viewDocument model.documentSources |> Array.toList)
             ]
 
@@ -444,10 +447,10 @@ viewDocumentSource model documentSource =
                 Err error ->
                     div [] [ text <| toString error ]
     in
-        div [ class "flex flex-wrap h-screen" ]
+        div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6" ]
-                [ div [ class "flex" ]
-                    [ h1 [ class "flex-1 mb-4 text-3xl text-blue" ] [ text document.title ]
+                [ div [ class "flex mb-4" ]
+                    [ h1 [ class "flex-1 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
                     ]
                 , introEl
@@ -461,7 +464,7 @@ viewDocumentSource model documentSource =
 
 view : Model -> Html Message
 view model =
-    div []
+    div [ class "flex flex-1" ]
         [ case model.nav of
             DocumentsList ->
                 viewDocuments model
