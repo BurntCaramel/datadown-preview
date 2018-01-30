@@ -367,10 +367,9 @@ viewFontAwesomeIcon id =
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
     div []
-        ([ [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ] ]
-        , case model.nav of
+        ([ case model.nav of
             DocumentsList ->
-                [
+                [ button [ onClick NewDocument, class "px-2 py-1 text-teal-dark bg-teal-lightest" ] [ viewFontAwesomeIcon "plus" ]
                 -- button [ onClick GoToDocumentsList, class "px-2 py-1 text-purple-lightest bg-purple-dark" ] [ viewFontAwesomeIcon "bars" ]
                 ]
             
