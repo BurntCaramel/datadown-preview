@@ -13,7 +13,7 @@ type Error
     | Parsing
     | NoInput
     | NotValue
-    | NoValueForIdentifier
+    | NoValueForIdentifier String
     | Unknown
     | InvalidValuesForOperator Operator JsonValue JsonValue
     | CannotConvertToJson
@@ -159,7 +159,7 @@ requireValue resolveIdentifier token =
                     Ok v
 
                 Err e ->
-                    Err NoValueForIdentifier
+                    Err (NoValueForIdentifier identifier)
 
         _ ->
             Err NotValue
