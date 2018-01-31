@@ -12,7 +12,7 @@ module Datadown.Parse
 
 -}
 
-import Datadown exposing (Document, Section, Content(..))
+import Datadown exposing (Document, Section(..), Content(..))
 import Dict
 import Regex exposing (Regex)
 import Markdown.Block as Block exposing (Block(..))
@@ -73,13 +73,14 @@ addContentToDocument content expressions document =
                 , introInlineExpressions = Dict.union document.introInlineExpressions (Dict.fromList expressions)
             }
 
-        section :: sectionsTail ->
+        Section section :: sectionsTail ->
             let
                 newSection =
-                    { section
-                        | mainContent = Just content
-                        , inlineExpressions = Dict.union section.inlineExpressions (Dict.fromList expressions)
-                    }
+                    Section
+                        { section
+                            | mainContent = content :: section.mainContent
+                            , inlineExpressions = Dict.union section.inlineExpressions (Dict.fromList expressions)
+                        }
             in
                 { document
                     | sections = newSection :: sectionsTail
@@ -88,11 +89,12 @@ addContentToDocument content expressions document =
 
 sectionWithTitle : String -> Section a
 sectionWithTitle title =
-    { title = title
-    , mainContent = Nothing
-    , secondaryContent = Dict.empty
-    , inlineExpressions = Dict.empty
-    }
+    Section
+        { title = title
+        , mainContent = []
+        , subsections = []
+        , inlineExpressions = Dict.empty
+        }
 
 
 processDocumentBlock : (String -> a) -> Block b i -> Document a -> Document a
@@ -177,10 +179,25 @@ processDocument parseExpressions blocks =
             , introInlineExpressions = Dict.empty
             , sections = []
             }
+        
+        postSection section =
+            case section of
+                Section record ->
+                    Section
+                        { record
+                        | mainContent = List.reverse record.mainContent
+                        }
+        
+        postDocument document =
+            { document
+            | sections = document.sections
+                |> List.map postSection
+                |> List.reverse 
+            }
     in
         blocks
             |> List.foldl (processDocumentBlock parseExpressions) initialDocument
-            |> \d -> { d | sections = d.sections |> List.reverse }
+            |> postDocument
 
 
 {-| Parses a Datadown document

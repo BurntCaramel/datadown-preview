@@ -1,7 +1,7 @@
 module Datadown
     exposing
         ( Document
-        , Section
+        , Section(..)
         , Content(..)
         )
 
@@ -31,12 +31,13 @@ type Content a
 
 {-| A section of data
 -}
-type alias Section a =
-    { title : String
-    , mainContent : Maybe (Content a)
-    , secondaryContent : Dict String (Content a)
-    , inlineExpressions : Dict String a
-    }
+type Section a =
+    Section
+        { title : String
+        , mainContent : List (Content a)
+        , subsections : List (Section a)
+        , inlineExpressions : Dict String a
+        }
 
 
 {-| A full document, with many sections

@@ -6,7 +6,7 @@ import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
 import Array exposing (Array)
-import Datadown exposing (Document, Content(..))
+import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error)
 import JsonValue exposing (JsonValue(..))
@@ -349,13 +349,19 @@ viewContentResult compact contentResult =
             div [ class "mb-3" ] [ viewContent compact content ]
 
 
+viewContentResults : Bool -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
+viewContentResults compact contentResults =
+    contentResults
+        |> List.map (viewContentResult compact)
+
+
 type alias SectionViewModel e =
     { title : String
-    , resolvedContent : Result e (Content (Result Error (List (List Token))))
+    , resolvedContent : List (Result e (Content (Result Error (List (List Token)))))
     }
 
 
-makeSectionViewModel : ( String, Result e (Content (Result Error (List (List Token)))) ) -> SectionViewModel e
+makeSectionViewModel : ( String, List (Result e (Content (Result Error (List (List Token))))) ) -> SectionViewModel e
 makeSectionViewModel ( title, resolvedContent ) =
     SectionViewModel title resolvedContent
 
@@ -367,7 +373,8 @@ viewSection { title, resolvedContent } =
             [ h2 [ class "mb-2 text-xl text-blue-dark" ] [ text title ]
             ]
         , resolvedContent
-            |> viewContentResult False
+            |> viewContentResults False
+            |> div []
 
         -- , div [] [ text (variables |> toString) ]
         ]
@@ -454,15 +461,7 @@ viewDocumentSource model documentSource =
                 |> List.map viewSection
         
         introEl =
-            case resolved.intro of
-                Ok content ->
-                   viewContentResult True (Ok content)
-                
-                Err (Process.NoContentForSection _) ->
-                    text ""
-
-                Err error ->
-                    div [ class "mb-3" ] [ text <| toString error ]
+            viewContentResults True resolved.intro
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
@@ -470,7 +469,7 @@ viewDocumentSource model documentSource =
                     [ h1 [ class "flex-1 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
                     ]
-                , introEl
+                , div [] introEl
                 , div [] resultsEl
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]

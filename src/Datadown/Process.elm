@@ -20,7 +20,7 @@ module Datadown.Process
 
 import Dict exposing (Dict(..))
 import Regex exposing (Regex)
-import Datadown exposing (Document, Section, Content(..))
+import Datadown exposing (Document, Section(..), Content(..))
 import JsonValue exposing (JsonValue)
 
 
@@ -39,8 +39,8 @@ type Error e
 
 
 type alias Resolved e a =
-    { sections : List (String, (Result (Error e) (Content a)))
-    , intro: (Result (Error e) (Content a))
+    { sections : List (String, List (Result (Error e) (Content a)))
+    , intro: List (Result (Error e) (Content a))
     , tests : List (Document a)
     }
 
@@ -109,13 +109,22 @@ contentForKeyInResults results key =
         |> Maybe.map Tuple.second
 
 
-processSection : (String -> Result (Error e) JsonValue) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> Result (Error e) (Content a)
-processSection valueForIdentifier evaluateExpression section =
+processSection : (String -> Result (Error e) (List JsonValue)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> List (Result (Error e) (Content a))
+processSection valueListForIdentifier evaluateExpression sectionWrapper =
     let
+        section =
+            case sectionWrapper of
+                Section section ->
+                    section
+
         expressionForString : String -> Maybe a
         expressionForString s =
             section.inlineExpressions
                 |> Dict.get s
+        
+        valueForIdentifier id =
+            valueListForIdentifier id
+                |> Result.map (JsonValue.ArrayValue)
 
         resolveExpressionString : String -> Maybe JsonValue
         resolveExpressionString s =
@@ -169,48 +178,62 @@ processSection valueForIdentifier evaluateExpression section =
                 content ->
                     Ok content
         
-        processMaybeContent maybeContent =
-            case maybeContent of
-                Just content ->
-                    processContent content
-
-                Nothing ->
-                    Err (NoContentForSection section.title)
+        processNextContent content results =
+            (processContent content) :: results
     in
-        processMaybeContent section.mainContent
+        section.mainContent
+            |> List.foldl processNextContent []
+            |> List.reverse
 
 
-nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> Result (Error e) (Content a)
-nextProcessedSection evaluateExpression contentToJson section prevResults =
-    let
-        contentForKey : String -> Result (Error e) (Content a)
-        contentForKey key =
-            case contentForKeyInResults prevResults key of
-                Just (Ok c) ->
-                    Ok c
-
-                Just (Err e) ->
+flattenResults : List (Result e a) -> Result e (List a)
+flattenResults inItems =
+    case inItems of
+        Ok c :: tail ->
+            case flattenResults tail of
+                Ok d  ->
+                    Ok (c :: d)
+            
+                Err e ->
                     Err e
 
-                Nothing ->
-                    Err (NoValueForIdentifier key)
+        Err e :: tail ->
+            Err e
 
-        valueForIdentifier : String -> Result (Error e) JsonValue
+        [] ->
+            Ok []
+
+
+nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, List ( Result (Error e) (Content a) ) ) -> List (Result (Error e) (Content a))
+nextProcessedSection evaluateExpression contentToJson section prevResults =
+    let
+        contentForKey : String -> Result (Error e) (List (Content a))
+        contentForKey key =
+            contentForKeyInResults prevResults key
+                |> Maybe.map flattenResults
+                |> Maybe.withDefault (Err (NoValueForIdentifier key))
+
+        valueForIdentifier : String -> Result (Error e) (List JsonValue)
         valueForIdentifier key =
             contentForKey key
-                |> Result.andThen (contentToJson >> Result.mapError (always CannotConvertContent))
+                |> Result.andThen (List.map (contentToJson >> Result.mapError (always CannotConvertContent)) >> flattenResults)
     in
         processSection valueForIdentifier evaluateExpression section
 
 
-foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, Result (Error e) (Content a) ) -> List ( String, Result (Error e) (Content a) )
-foldProcessedSections evaluateExpression contentToJson section prevResults =
+foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, List ( Result (Error e) (Content a) ) ) -> List ( String, List( Result (Error e) (Content a) ) )
+foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResults =
     let
-        result : Result (Error e) (Content a)
+        title =
+            case sectionWrapper of
+                Section section ->
+                    section.title
+
+        result : List (Result (Error e) (Content a))
         result =
-            nextProcessedSection evaluateExpression contentToJson section prevResults
+            nextProcessedSection evaluateExpression contentToJson sectionWrapper prevResults
     in
-        ( section.title, result ) :: prevResults
+        ( title, result ) :: prevResults
 
 
 {-| Process a document and return a result
@@ -225,19 +248,20 @@ processDocument evaluateExpression contentToJson document =
                 
         resolvedIntro =
             case document.introContent of
-                hd :: tail ->
+                [] ->
+                    [ Err (NoContentForSection "intro") ]
+                
+                items ->
                     let
                         introSection =
-                            { title = "intro"
-                            , mainContent = Just hd
-                            , secondaryContent = Dict.empty
-                            , inlineExpressions = document.introInlineExpressions
-                            }
+                            Section
+                                { title = "intro"
+                                , mainContent = items
+                                , subsections = []
+                                , inlineExpressions = document.introInlineExpressions
+                                }
                     in
                         nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
-
-                [] ->
-                    Err (NoContentForSection "intro")
 
     in
         { sections = resolvedSections
