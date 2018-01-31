@@ -73,13 +73,53 @@ addContentToDocument content expressions document =
                 , introInlineExpressions = Dict.union document.introInlineExpressions (Dict.fromList expressions)
             }
 
+        Section sectionRecord :: sectionsTail ->
+            case sectionRecord.subsections of
+                [] ->
+                    let
+                        newSection =
+                            Section
+                                { sectionRecord
+                                    | mainContent = content :: sectionRecord.mainContent
+                                    , inlineExpressions = Dict.union sectionRecord.inlineExpressions (Dict.fromList expressions)
+                                }
+                    in
+                        { document
+                            | sections = newSection :: sectionsTail
+                        }
+
+                Section subsectionRecord :: subsectionsTail ->
+                    let
+                        newSubsection =
+                            Section
+                                { subsectionRecord
+                                    | mainContent = content :: subsectionRecord.mainContent
+                                    , inlineExpressions = Dict.union subsectionRecord.inlineExpressions (Dict.fromList expressions)
+                                }
+                        
+                        newSection =
+                            Section
+                                { sectionRecord
+                                    | subsections = newSubsection :: subsectionsTail
+                                }
+                    in
+                        { document
+                            | sections = newSection :: sectionsTail
+                        }
+
+
+addSubsectionToDocument : Section a -> Document a -> Document a
+addSubsectionToDocument subsection document =
+    case document.sections of
+        [] ->
+            document
+
         Section section :: sectionsTail ->
             let
                 newSection =
                     Section
                         { section
-                            | mainContent = content :: section.mainContent
-                            , inlineExpressions = Dict.union section.inlineExpressions (Dict.fromList expressions)
+                            | subsections = subsection :: section.subsections
                         }
             in
                 { document
@@ -114,6 +154,16 @@ processDocumentBlock parseExpressions block document =
                 { document
                     | sections = (sectionWithTitle title) :: document.sections
                 }
+        
+        Heading text 3 inlines ->
+            let
+                title : String
+                title =
+                    inlines
+                        |> Inline.extractText
+                        |> String.trim
+            in
+                addSubsectionToDocument (sectionWithTitle title) document
 
         Block.List listBlock items ->
             let
