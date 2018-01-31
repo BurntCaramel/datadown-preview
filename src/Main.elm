@@ -321,7 +321,7 @@ viewContent compact content =
         Expressions expressionsResult ->
             case expressionsResult of
                 Err expressionsError ->
-                    h3 [] [ text <| toString expressionsError ]
+                    h3 [ class "px-2 py-1 text-white bg-red-dark" ] [ text <| toString expressionsError ]
 
                 Ok expressions ->
                     pre [ class "px-2 py-2 text-teal-darker bg-teal-lightest" ]
@@ -343,7 +343,7 @@ viewContentResult compact contentResult =
                     div [ class "mb-3" ] [ em [] [ text "(No content)" ] ]
 
                 _ ->
-                    div [ class "mb-3" ] [ text (toString error) ]
+                    div [ class "mb-3 px-2 py-1 text-white bg-red-dark" ] [ text (toString error) ]
 
         Ok content ->
             div [ class "mb-3" ] [ viewContent compact content ]
