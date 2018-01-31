@@ -8,7 +8,7 @@ import Date
 import Array exposing (Array)
 import Datadown exposing (Document, Content(..))
 import Datadown.Parse exposing (parseDocument)
-import Datadown.Process as Process exposing (processDocument, listVariablesInDocument, Error)
+import Datadown.Process as Process exposing (processDocument, Error)
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
@@ -352,17 +352,16 @@ viewContentResult compact contentResult =
 type alias SectionViewModel e =
     { title : String
     , resolvedContent : Result e (Content (Result Error (List (List Token))))
-    , variables : List String
     }
 
 
-makeSectionViewModel : ( String, Result e (Content (Result Error (List (List Token)))) ) -> ( String, List String ) -> SectionViewModel e
-makeSectionViewModel ( title, resolvedContent ) ( _, variables ) =
-    SectionViewModel title resolvedContent variables
+makeSectionViewModel : ( String, Result e (Content (Result Error (List (List Token)))) ) -> SectionViewModel e
+makeSectionViewModel ( title, resolvedContent ) =
+    SectionViewModel title resolvedContent
 
 
 viewSection : SectionViewModel (Process.Error Evaluate.Error) -> Html Message
-viewSection { title, resolvedContent, variables } =
+viewSection { title, resolvedContent } =
     details [ attribute "open" "" ]
         [ summary []
             [ h2 [ class "mb-2 text-xl text-blue-dark" ] [ text title ]
@@ -447,11 +446,8 @@ viewDocumentSource model documentSource =
         resolved =
             processDocument (evaluateExpressions model) (contentToJson model) document
 
-        sectionVariables =
-            listVariablesInDocument document
-
         results =
-            List.map2 makeSectionViewModel resolved.sections sectionVariables
+            List.map makeSectionViewModel resolved.sections
 
         resultsEl =
             results

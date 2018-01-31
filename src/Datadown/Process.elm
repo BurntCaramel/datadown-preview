@@ -1,7 +1,6 @@
 module Datadown.Process
     exposing
         ( processDocument
-        , listVariablesInDocument
         , Error(..)
         )
 
@@ -245,28 +244,3 @@ processDocument evaluateExpression contentToJson document =
         , intro = resolvedIntro
         , tests = []
         }
-
-
-listVariablesInSection : Section a -> ( String, List String )
-listVariablesInSection section =
-    let
-        variables =
-            case section.mainContent of
-                Just (Text text) ->
-                    listMustacheVariables text
-
-                Just (Code language codeText) ->
-                    listMustacheVariables codeText
-
-                _ ->
-                    []
-    in
-        ( section.title, variables )
-
-
-{-| List all variables within sections in a document
--}
-listVariablesInDocument : Document a -> List ( String, List String )
-listVariablesInDocument document =
-    document.sections
-        |> List.map listVariablesInSection
