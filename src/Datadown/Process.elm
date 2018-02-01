@@ -134,7 +134,6 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                     Just record.mainContent
                                 else    
                                     contentForKeyPathInResolvedSections record.subsections otherKeys
-                                        |> Debug.log ("content in nested key path " ++ toString record.subsections)
                             else
                                 Nothing
 
