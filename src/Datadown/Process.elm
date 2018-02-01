@@ -2,6 +2,7 @@ module Datadown.Process
     exposing
         ( processDocument
         , Error(..)
+        , ResolvedSection(..)
         )
 
 {-| Process
@@ -39,10 +40,16 @@ type Error e
 
 
 type alias Resolved e a =
-    { sections : List (String, List (Result (Error e) (Content a)))
+    { sections : List (String, ResolvedSection (Error e) a)
     , intro: List (Result (Error e) (Content a))
     , tests : List (Document a)
     }
+
+type ResolvedSection e a =
+    ResolvedSection
+        { mainContent : List (Result e (Content a))
+        , subsections : List (String, ResolvedSection e a)
+        }
 
 
 mustacheVariableRegex : Regex
@@ -107,6 +114,49 @@ contentForKeyInResults results key =
         |> List.filter (\( key_, result ) -> key_ == key)
         |> List.head
         |> Maybe.map Tuple.second
+
+
+contentForKeyPathInResolvedSections : List (String, ResolvedSection (Error e) a) -> List String -> Maybe (List (Result (Error e) (Content a)))
+contentForKeyPathInResolvedSections resolvedSections keyPath =
+    case keyPath of
+        firstKey :: otherKeys ->
+            let
+                -- hasKey : (String, ResolvedSection e a) -> Bool
+                -- hasKey =
+                --     \( key_, resolvedSection ) -> key_ == firstKey
+                
+                findContentInSection : (String, ResolvedSection (Error e) a) -> Maybe (List (Result (Error e) (Content a)))
+                findContentInSection (key, resolvedSection) =
+                    case resolvedSection of
+                        ResolvedSection record ->
+                            if key == firstKey then
+                                if otherKeys == [] then
+                                    Just record.mainContent
+                                else    
+                                    contentForKeyPathInResolvedSections record.subsections otherKeys
+                                        |> Debug.log ("content in nested key path " ++ toString record.subsections)
+                            else
+                                Nothing
+
+                findInSections resolvedSections =
+                    case resolvedSections of
+                        [] ->
+                            Nothing
+                        
+                        head :: tail ->
+                            case findContentInSection head of
+                                Just content ->
+                                    Just content
+                                
+                                Nothing ->
+                                    findInSections tail
+                        
+            in
+                findInSections resolvedSections
+                
+        
+        [] ->
+            Nothing
 
 
 processSection : (String -> Result (Error e) (List JsonValue)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> List (Result (Error e) (Content a))
@@ -204,12 +254,14 @@ flattenResults inItems =
             Ok []
 
 
-nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, List ( Result (Error e) (Content a) ) ) -> List (Result (Error e) (Content a))
+nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List (Result (Error e) (Content a))
 nextProcessedSection evaluateExpression contentToJson section prevResults =
     let
         contentForKey : String -> Result (Error e) (List (Content a))
         contentForKey key =
-            contentForKeyInResults prevResults key
+            key
+                |> String.split "."
+                |> contentForKeyPathInResolvedSections prevResults
                 |> Maybe.map flattenResults
                 |> Maybe.withDefault (Err (NoValueForIdentifier key))
 
@@ -221,19 +273,35 @@ nextProcessedSection evaluateExpression contentToJson section prevResults =
         processSection valueForIdentifier evaluateExpression section
 
 
-foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, List ( Result (Error e) (Content a) ) ) -> List ( String, List( Result (Error e) (Content a) ) )
+foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List ( String, ResolvedSection (Error e) a )
 foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResults =
     let
         title =
             case sectionWrapper of
                 Section section ->
                     section.title
+        
+        subsections =
+            case sectionWrapper of
+                Section section ->
+                    section.subsections
 
-        result : List (Result (Error e) (Content a))
-        result =
+        resolvedMainContent : List (Result (Error e) (Content a))
+        resolvedMainContent =
             nextProcessedSection evaluateExpression contentToJson sectionWrapper prevResults
+        
+        resolvedSubsections =
+            subsections
+                |> List.foldl (foldProcessedSections evaluateExpression contentToJson) prevResults
+                |> List.take (List.length subsections)
+        
+        resolvedSection =
+            ResolvedSection
+                { mainContent = resolvedMainContent
+                , subsections = resolvedSubsections
+                }
     in
-        ( title, result ) :: prevResults
+        ( title, resolvedSection ) :: prevResults
 
 
 {-| Process a document and return a result
@@ -241,6 +309,7 @@ foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResult
 processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Resolved e a
 processDocument evaluateExpression contentToJson document =
     let
+        resolvedSections : List ( String, ResolvedSection (Error e) a )
         resolvedSections =
             document.sections
                 |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []

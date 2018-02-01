@@ -8,7 +8,7 @@ import Date
 import Array exposing (Array)
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
-import Datadown.Process as Process exposing (processDocument, Error)
+import Datadown.Process as Process exposing (processDocument, Error, ResolvedSection(..))
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
@@ -357,24 +357,47 @@ viewContentResults compact contentResults =
 
 type alias SectionViewModel e =
     { title : String
-    , resolvedContent : List (Result e (Content (Result Error (List (List Token)))))
+    , mainContent : List (Result e (Content (Result Error (List (List Token)))))
+    , subsections : List (String, ResolvedSection e (Result Error (List (List Token))))
     }
 
 
-makeSectionViewModel : ( String, List (Result e (Content (Result Error (List (List Token))))) ) -> SectionViewModel e
-makeSectionViewModel ( title, resolvedContent ) =
-    SectionViewModel title resolvedContent
+makeSectionViewModel : ( String, ResolvedSection e (Result Error (List (List Token))) ) -> SectionViewModel e
+makeSectionViewModel ( title, resolvedSection ) =
+    case resolvedSection of
+        ResolvedSection record ->
+            SectionViewModel title record.mainContent record.subsections
 
 
-viewSection : SectionViewModel (Process.Error Evaluate.Error) -> Html Message
-viewSection { title, resolvedContent } =
+viewSectionTitle : Int -> List (Html.Html msg) -> Html.Html msg
+viewSectionTitle level =
+    case level of
+        1 ->
+            h2 [ class "mb-2 text-xl text-blue-dark" ]
+        
+        2 ->
+            h3 [ class "mb-2 text-lg text-blue-dark" ]
+        
+        3 ->
+            h4 [ class "mb-2 text-base text-blue-dark" ]
+        
+        _ ->
+            h4 [ class "mb-2 text-sm text-blue-dark" ]
+
+
+viewSection : Int -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
+viewSection level { title, mainContent, subsections } =
     details [ attribute "open" "" ]
         [ summary []
-            [ h2 [ class "mb-2 text-xl text-blue-dark" ] [ text title ]
+            [ viewSectionTitle level [ text title ]
             ]
-        , resolvedContent
+        , mainContent
             |> viewContentResults False
             |> div []
+        , subsections
+            |> List.map makeSectionViewModel
+            |> List.map (viewSection (level + 1))
+            |> div [ class "ml-2" ]
 
         -- , div [] [ text (variables |> toString) ]
         ]
@@ -458,7 +481,7 @@ viewDocumentSource model documentSource =
 
         resultsEl =
             results
-                |> List.map viewSection
+                |> List.map (viewSection 1)
         
         introEl =
             viewContentResults True resolved.intro

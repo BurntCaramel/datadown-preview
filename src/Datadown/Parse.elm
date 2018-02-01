@@ -96,6 +96,7 @@ addContentToDocument content expressions document =
                                     | mainContent = content :: subsectionRecord.mainContent
                                     , inlineExpressions = Dict.union subsectionRecord.inlineExpressions (Dict.fromList expressions)
                                 }
+                                |> Debug.log "new subsection"
                         
                         newSection =
                             Section
@@ -164,6 +165,7 @@ processDocumentBlock parseExpressions block document =
                         |> String.trim
             in
                 addSubsectionToDocument (sectionWithTitle title) document
+                    |> Debug.log ("Add subsection " ++ title)
 
         Block.List listBlock items ->
             let
