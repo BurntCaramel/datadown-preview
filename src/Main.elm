@@ -37,6 +37,12 @@ type Error
     | Process Process.Error
 
 
+type alias DisplayOptions =
+    { compact : Bool
+    , hideNoContent : Bool
+    }
+
+
 parseExpressions : String -> Result Error (List (List Token))
 parseExpressions input =
     case tokenize input of
@@ -286,13 +292,13 @@ viewCodePreview language source =
             [ text (language |> Maybe.withDefault "none") ]
 
 
-viewCode : Bool -> Maybe String -> String -> Html Message
-viewCode compact language source =
+viewCode : DisplayOptions -> Maybe String -> String -> Html Message
+viewCode options language source =
     let
         previewHtml =
             div [] (viewCodePreview language source)
     in
-        if not compact && showCodeForLanguage language then
+        if not options.compact && showCodeForLanguage language then
             div []
                 [ previewHtml
                 , details [ class "mt-2" ] 
@@ -306,14 +312,14 @@ viewCode compact language source =
             div [] [ previewHtml ]
 
 
-viewContent : Bool -> Content (Result Error (List (List Token))) -> Html Message
-viewContent compact content =
+viewContent : DisplayOptions -> Content (Result Error (List (List Token))) -> Html Message
+viewContent options content =
     case content of
         Text s ->
             div [ class "font-sans w-full" ] [ text s ]
 
         Code language source ->
-            viewCode compact language source
+            viewCode options language source
 
         Json json ->
             Preview.Json.viewJson json
@@ -328,31 +334,34 @@ viewContent compact content =
                         [ code [ class "font-mono text-sm" ] (List.map viewExpression expressions) ]
 
         List items ->
-            ul [] (List.map (\item -> li [] [ viewContent compact item ]) items)
+            ul [] (List.map (\item -> li [] [ viewContent options item ]) items)
 
         Quote document ->
             pre [] [ code [] [ text "quoted document" ] ]
 
 
-viewContentResult : Bool -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
-viewContentResult compact contentResult =
+viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
+viewContentResult options contentResult =
     case contentResult of
         Err error ->
             case error of
                 Process.NoContentForSection name ->
-                    div [ class "mb-3" ] [ em [] [ text "(No content)" ] ]
+                    if options.hideNoContent then
+                        text ""
+                    else
+                        div [ class "mb-3" ] [ em [] [ text "(No content)" ] ]
 
                 _ ->
                     div [ class "mb-3 px-2 py-1 text-white bg-red-dark" ] [ text (toString error) ]
 
         Ok content ->
-            div [ class "mb-3" ] [ viewContent compact content ]
+            div [ class "mb-3" ] [ viewContent options content ]
 
 
-viewContentResults : Bool -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
-viewContentResults compact contentResults =
+viewContentResults : DisplayOptions -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
+viewContentResults options contentResults =
     contentResults
-        |> List.map (viewContentResult compact)
+        |> List.map (viewContentResult options)
 
 
 type alias SectionViewModel e =
@@ -392,7 +401,7 @@ viewSection level { title, mainContent, subsections } =
             [ viewSectionTitle level [ text title ]
             ]
         , mainContent
-            |> viewContentResults False
+            |> viewContentResults { compact = False, hideNoContent = False }
             |> div []
         , subsections
             |> List.map makeSectionViewModel
@@ -484,7 +493,8 @@ viewDocumentSource model documentSource =
                 |> List.map (viewSection 1)
         
         introEl =
-            viewContentResults True resolved.intro
+            resolved.intro
+                |> viewContentResults { compact = True, hideNoContent = True }
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
