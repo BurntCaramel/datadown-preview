@@ -8,7 +8,7 @@ import Date
 import Array exposing (Array)
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
-import Datadown.Process as Process exposing (processDocument, Error, ResolvedSection(..))
+import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
@@ -40,6 +40,7 @@ type Error
 type alias DisplayOptions =
     { compact : Bool
     , hideNoContent : Bool
+    , processDocument : Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
     }
 
 
@@ -337,7 +338,14 @@ viewContent options content =
             ul [] (List.map (\item -> li [] [ viewContent options item ]) items)
 
         Quote document ->
-            pre [] [ code [] [ text "quoted document" ] ]
+            let
+                resolved =
+                    options.processDocument document
+            in
+                resolved.sections
+                    |> List.map makeSectionViewModel
+                    |> List.map (viewSection 1 options)
+                    |> div [ class "pl-6 border-l border-teal" ]
 
 
 viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
@@ -394,18 +402,18 @@ viewSectionTitle level =
             h4 [ class "mb-2 text-sm text-blue-dark" ]
 
 
-viewSection : Int -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
-viewSection level { title, mainContent, subsections } =
+viewSection : Int -> DisplayOptions -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
+viewSection level options { title, mainContent, subsections } =
     details [ attribute "open" "" ]
         [ summary []
             [ viewSectionTitle level [ text title ]
             ]
         , mainContent
-            |> viewContentResults { compact = False, hideNoContent = False }
+            |> viewContentResults options
             |> div []
         , subsections
             |> List.map makeSectionViewModel
-            |> List.map (viewSection (level + 1))
+            |> List.map (viewSection (level + 1) options)
             |> div [ class "ml-2" ]
 
         -- , div [] [ text (variables |> toString) ]
@@ -481,20 +489,28 @@ viewDocumentSource model documentSource =
         document : Document (Result Error (List (List Token)))
         document =
             parseDocument parseExpressions documentSource
-
-        resolved =
-            processDocument (evaluateExpressions model) (contentToJson model) document
-
-        results =
-            List.map makeSectionViewModel resolved.sections
-
-        resultsEl =
-            results
-                |> List.map (viewSection 1)
         
-        introEl =
+        processDocument_ =
+            processDocument (evaluateExpressions model) (contentToJson model)
+
+        resolved : Resolved Evaluate.Error (Result Error (List (List Token)))
+        resolved =
+            processDocument_ document
+        
+        displayOptions =
+            { compact = False, hideNoContent = False, processDocument = processDocument_ }
+
+        resultsHtml : List (Html Message)
+        resultsHtml =
+            resolved.sections
+                |> List.map makeSectionViewModel
+                |> List.map (viewSection 1 displayOptions)
+        
+        introHtml : List (Html Message)
+        introHtml =
             resolved.intro
-                |> viewContentResults { compact = True, hideNoContent = True }
+                |> viewContentResults
+                    { compact = True, hideNoContent = True, processDocument = processDocument_ }
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
@@ -502,8 +518,8 @@ viewDocumentSource model documentSource =
                     [ h1 [ class "flex-1 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
                     ]
-                , div [] introEl
-                , div [] resultsEl
+                , div [] introHtml
+                , div [] resultsHtml
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]
                 [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []

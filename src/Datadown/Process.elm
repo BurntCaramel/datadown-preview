@@ -2,6 +2,7 @@ module Datadown.Process
     exposing
         ( processDocument
         , Error(..)
+        , Resolved
         , ResolvedSection(..)
         )
 
