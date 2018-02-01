@@ -42,6 +42,9 @@ toFloat value =
             s
                 |> String.toFloat
                 |> Result.toMaybe
+        
+        ArrayValue (item :: []) ->
+            toFloat item
 
         _ ->
             Nothing
@@ -120,8 +123,8 @@ processOperator op a b =
                     Err <| InvalidValuesForOperator op a b
         
         Math function ->
-            case ( a, b ) of
-                ( NumericValue a, NumericValue b ) ->
+            case ( toFloat a, toFloat b ) of
+                ( Just a, Just b ) ->
                     Ok <| NumericValue <|
                         case function of
                             Sine ->
