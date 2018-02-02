@@ -29,8 +29,7 @@ import JsonValue exposing (JsonValue)
 {-| Error after processing, possibly from evaluating expressions
 -}
 type Error e
-    = NoContentForSection String
-    | NoValueForIdentifier String
+    = NoValueForIdentifier String
     | CannotConvertContent
     | NoSection String
     | UnknownKind
@@ -122,17 +121,18 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
     case keyPath of
         firstKey :: otherKeys ->
             let
-                -- hasKey : (String, ResolvedSection e a) -> Bool
-                -- hasKey =
-                --     \( key_, resolvedSection ) -> key_ == firstKey
-                
                 findContentInSection : (String, ResolvedSection (Error e) a) -> Maybe (List (Result (Error e) (Content a)))
                 findContentInSection (key, resolvedSection) =
                     case resolvedSection of
                         ResolvedSection record ->
                             if key == firstKey then
                                 if otherKeys == [] then
-                                    Just record.mainContent
+                                    case record.mainContent of
+                                        [] ->
+                                            Nothing
+
+                                        _ ->
+                                            Just record.mainContent
                                 else    
                                     contentForKeyPathInResolvedSections record.subsections otherKeys
                             else
@@ -316,22 +316,17 @@ processDocument evaluateExpression contentToJson document =
                 |> List.reverse
                 
         resolvedIntro =
-            case document.introContent of
-                [] ->
-                    [ Err (NoContentForSection "intro") ]
-                
-                items ->
-                    let
-                        introSection =
-                            Section
-                                { title = "intro"
-                                , mainContent = items
-                                , subsections = []
-                                , inlineExpressions = document.introInlineExpressions
-                                }
-                    in
-                        nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
-                            |> List.reverse
+            let
+                introSection =
+                    Section
+                        { title = "intro"
+                        , mainContent = document.introContent
+                        , subsections = []
+                        , inlineExpressions = document.introInlineExpressions
+                        }
+            in
+                nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
+                    |> List.reverse
 
     in
         { sections = resolvedSections

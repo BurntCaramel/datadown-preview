@@ -6,6 +6,7 @@ import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
 import Array exposing (Array)
+import Dict exposing (Dict)
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
@@ -23,6 +24,7 @@ type alias Model =
     { documentSources : Array String
     , nav : Nav
     , now : Time
+    , sectionInputs : Dict String JsonValue
     }
 
 
@@ -41,6 +43,7 @@ type alias DisplayOptions =
     { compact : Bool
     , hideNoContent : Bool
     , processDocument : Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
+    , sectionInputs : Dict String JsonValue
     }
 
 
@@ -54,8 +57,8 @@ parseExpressions input =
             Ok tokens
 
 
-valueFromModel : Model -> String -> Maybe JsonValue
-valueFromModel model key =
+builtInValueFromModel : Model -> String -> Maybe JsonValue
+builtInValueFromModel model key =
     case key of
         "now.seconds" ->
             model.now
@@ -89,16 +92,27 @@ valueFromModel model key =
             Nothing
 
 
+valueFromModel : Model -> String -> Maybe JsonValue
+valueFromModel model key =
+    case Dict.get key model.sectionInputs of
+        Just value ->
+            Just value
+        
+        Nothing ->
+            builtInValueFromModel model key
+
+
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
 evaluateExpressions model resolveFromDocument parsedExpressions =
     let
         resolveWithModel key =
-            case valueFromModel model key of
-                Just value ->
+            case resolveFromDocument key of
+                Ok value ->
                     Ok value
                 
-                Nothing ->
-                    resolveFromDocument key
+                Err error ->
+                    valueFromModel model key
+                        |> Result.fromMaybe (Err error)
     in
         
     case parsedExpressions of
@@ -149,6 +163,7 @@ init =
             |> Array.fromList
     , nav = Document 0
     , now = 0
+    , sectionInputs = Dict.empty
     }
         ! [ Cmd.none
           ]
@@ -161,6 +176,7 @@ type Message
     | GoToNextDocument
     | GoToDocumentAtIndex Int
     | NewDocument
+    | ChangeSectionInput String String
     | Time Time
 
 
@@ -237,6 +253,17 @@ update msg model =
                     Array.append prefix suffix
             in
                 ( { model | documentSources = documentSources }, Cmd.none )
+
+        ChangeSectionInput sectionTitle newInput ->
+            let
+                newValue =
+                    StringValue newInput
+                
+                newSectionInputs =
+                    Dict.insert sectionTitle newValue model.sectionInputs
+            in
+                ( { model | sectionInputs = newSectionInputs }, Cmd.none )
+                
 
         Time time ->
             ( { model | now = time }, Cmd.none )
@@ -344,7 +371,7 @@ viewContent options content =
             in
                 resolved.sections
                     |> List.map makeSectionViewModel
-                    |> List.map (viewSection 1 options)
+                    |> List.map (viewSection [] options)
                     |> div [ class "pl-6 border-l border-teal" ]
 
 
@@ -353,12 +380,6 @@ viewContentResult options contentResult =
     case contentResult of
         Err error ->
             case error of
-                Process.NoContentForSection name ->
-                    if options.hideNoContent then
-                        text ""
-                    else
-                        div [ class "mb-3" ] [ em [] [ text "(No content)" ] ]
-
                 _ ->
                     div [ class "mb-3 px-2 py-1 text-white bg-red-dark" ] [ text (toString error) ]
 
@@ -366,10 +387,36 @@ viewContentResult options contentResult =
             div [ class "mb-3" ] [ viewContent options content ]
 
 
-viewContentResults : DisplayOptions -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
-viewContentResults options contentResults =
-    contentResults
-        |> List.map (viewContentResult options)
+viewContentResults : DisplayOptions -> List String -> String -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
+viewContentResults options parentPath sectionTitle contentResults =
+    case contentResults of
+        [] ->
+            if options.hideNoContent then
+                [ text "" ]
+            else
+                let
+                    key =
+                        sectionTitle :: parentPath
+                            |> List.reverse
+                            |> String.join "."
+
+                    stringValue =
+                        case Dict.get key options.sectionInputs of
+                            Nothing ->
+                                ""
+                            
+                            Just (StringValue s) ->
+                                s
+                            
+                            json ->
+                                toString json
+                in
+                    [ textarea [ value stringValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
+                    ]
+
+        _ ->
+            contentResults
+                |> List.map (viewContentResult options)
 
 
 type alias SectionViewModel e =
@@ -389,31 +436,31 @@ makeSectionViewModel ( title, resolvedSection ) =
 viewSectionTitle : Int -> List (Html.Html msg) -> Html.Html msg
 viewSectionTitle level =
     case level of
-        1 ->
+        0 ->
             h2 [ class "mb-2 text-xl text-blue-dark" ]
         
-        2 ->
+        1 ->
             h3 [ class "mb-2 text-lg text-blue-dark" ]
         
-        3 ->
+        2 ->
             h4 [ class "mb-2 text-base text-blue-dark" ]
         
         _ ->
             h4 [ class "mb-2 text-sm text-blue-dark" ]
 
 
-viewSection : Int -> DisplayOptions -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
-viewSection level options { title, mainContent, subsections } =
+viewSection : List String -> DisplayOptions -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
+viewSection sectionPath options { title, mainContent, subsections } =
     details [ attribute "open" "" ]
         [ summary []
-            [ viewSectionTitle level [ text title ]
+            [ viewSectionTitle (List.length sectionPath) [ text title ]
             ]
         , mainContent
-            |> viewContentResults options
+            |> viewContentResults options sectionPath title
             |> div []
         , subsections
             |> List.map makeSectionViewModel
-            |> List.map (viewSection (level + 1) options)
+            |> List.map (viewSection (title :: sectionPath) options)
             |> div [ class "ml-2" ]
 
         -- , div [] [ text (variables |> toString) ]
@@ -498,19 +545,29 @@ viewDocumentSource model documentSource =
             processDocument_ document
         
         displayOptions =
-            { compact = False, hideNoContent = False, processDocument = processDocument_ }
+            { compact = False
+            , hideNoContent = False
+            , processDocument = processDocument_
+            , sectionInputs = model.sectionInputs
+            }
 
         resultsHtml : List (Html Message)
         resultsHtml =
             resolved.sections
                 |> List.map makeSectionViewModel
-                |> List.map (viewSection 1 displayOptions)
+                |> List.map (viewSection [] displayOptions)
         
         introHtml : List (Html Message)
         introHtml =
             resolved.intro
                 |> viewContentResults
-                    { compact = True, hideNoContent = True, processDocument = processDocument_ }
+                    { compact = True
+                    , hideNoContent = True
+                    , processDocument = processDocument_
+                    , sectionInputs = model.sectionInputs
+                    }
+                    []
+                    "intro"
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
