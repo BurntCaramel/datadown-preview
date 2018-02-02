@@ -331,6 +331,7 @@ processDocument evaluateExpression contentToJson document =
                                 }
                     in
                         nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
+                            |> List.reverse
 
     in
         { sections = resolvedSections
