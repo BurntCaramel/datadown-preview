@@ -395,8 +395,14 @@ viewContentResults options parentPath sectionTitle contentResults =
                 [ text "" ]
             else
                 let
+                    baseTitle =
+                        sectionTitle
+                            |> String.split ":"
+                            |> List.head
+                            |> Maybe.withDefault ""
+
                     key =
-                        sectionTitle :: parentPath
+                        baseTitle :: parentPath
                             |> List.reverse
                             |> String.join "."
 
