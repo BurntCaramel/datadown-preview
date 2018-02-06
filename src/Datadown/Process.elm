@@ -99,19 +99,6 @@ mustache resolveVariable input =
         Regex.replace Regex.All mustacheVariableRegex replacer input
 
 
-listMustacheVariables : String -> List String
-listMustacheVariables input =
-    let
-        extractor : Regex.Match -> Maybe String
-        extractor match =
-            match.submatches
-                |> List.head
-                |> Maybe.withDefault Nothing
-    in
-        Regex.find Regex.All mustacheVariableRegex input
-            |> List.filterMap extractor
-
-
 contentForKeyInResults : List ( a, r ) -> a -> Maybe r
 contentForKeyInResults results key =
     results
