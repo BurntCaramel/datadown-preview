@@ -672,16 +672,16 @@ viewDocumentSource model documentSource =
                     "intro"
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
-            [ div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
+            [ div [ class "flex-1 min-w-full md:min-w-0" ]
+                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
+                ]
+            , div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
                 [ div [ class "flex mb-4" ]
                     [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
                     ]
                 , div [ class "pr-4" ] introHtml
                 , div [ class "pr-4" ] sectionsHtml
-                ]
-            , div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
                 ]
             ]
 
