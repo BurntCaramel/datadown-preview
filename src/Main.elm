@@ -15,7 +15,7 @@ import Parser exposing (Error)
 import Preview.Json
 import Preview.Html
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
-import Expressions.Evaluate as Evaluate exposing (evaulateTokenLines)
+import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
 import Samples.Clock
 
@@ -123,7 +123,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
                 Err Evaluate.Parsing
 
             Ok expressions ->
-                evaulateTokenLines resolveWithModel expressions
+                evaluateTokenLines resolveWithModel expressions
 
 
 contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue

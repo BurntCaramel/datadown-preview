@@ -1,6 +1,6 @@
 module Expressions.Evaluate
     exposing
-        ( evaulateTokenLines
+        ( evaluateTokenLines
         , Error(..)
         )
 
@@ -229,8 +229,8 @@ evaluateTokens resolveIdentifier previousValue tokens =
             Err NoInput
 
 
-evaulateTokenLines : (String -> Result e JsonValue) -> List (List Token) -> Result Error JsonValue
-evaulateTokenLines resolveIdentifier lines =
+evaluateTokenLines : (String -> Result e JsonValue) -> List (List Token) -> Result Error JsonValue
+evaluateTokenLines resolveIdentifier lines =
     let
         reducer : List Token -> Maybe (Result Error JsonValue) -> Maybe (Result Error JsonValue)
         reducer =
