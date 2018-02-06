@@ -475,8 +475,8 @@ viewContentResult options contentResult =
             div [ class "mb-3" ] [ viewContent options content ]
 
 
-viewContentResults : DisplayOptions -> List String -> String -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List (Html Message)
-viewContentResults options parentPath sectionTitle contentResults =
+viewContentResults : DisplayOptions -> List String -> String -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List b -> List (Html Message)
+viewContentResults options parentPath sectionTitle contentResults subsections =
     case contentResults of
         [] ->
             if options.hideNoContent then
@@ -505,9 +505,15 @@ viewContentResults options parentPath sectionTitle contentResults =
 
                             json ->
                                 toString json
+                    
+                    hasSubsections =
+                        not <| List.isEmpty subsections
                 in
-                    [ textarea [ value stringValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
-                    ]
+                    if hasSubsections then
+                        []
+                    else
+                        [ textarea [ value stringValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
+                        ]
 
         _ ->
             contentResults
@@ -550,8 +556,7 @@ viewSection sectionPath options { title, mainContent, subsections } =
         [ summary []
             [ viewSectionTitle (List.length sectionPath) [ text title ]
             ]
-        , mainContent
-            |> viewContentResults options sectionPath title
+        , viewContentResults options sectionPath title mainContent subsections
             |> div []
         , subsections
             |> List.map makeSectionViewModel
@@ -670,6 +675,7 @@ viewDocumentSource model documentSource =
                     }
                     []
                     "intro"
+                    []
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
             [ div [ class "flex-1 min-w-full md:min-w-0" ]
