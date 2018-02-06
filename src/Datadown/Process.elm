@@ -99,14 +99,6 @@ mustache resolveVariable input =
         Regex.replace Regex.All mustacheVariableRegex replacer input
 
 
-contentForKeyInResults : List ( a, r ) -> a -> Maybe r
-contentForKeyInResults results key =
-    results
-        |> List.filter (\( key_, result ) -> key_ == key)
-        |> List.head
-        |> Maybe.map Tuple.second
-
-
 contentForKeyPathInResolvedSections : List ( String, ResolvedSection (Error e) a ) -> List String -> Maybe (List (Result (Error e) (Content a)))
 contentForKeyPathInResolvedSections resolvedSections keyPath =
     case keyPath of
