@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Html exposing (..)
-import Html.Attributes exposing (class, rows, attribute, value)
+import Html.Attributes exposing (class, id, rows, attribute, value)
 import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
@@ -574,21 +574,21 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "" ]
+    div [ class "bg-indigo-darkest" ]
         [ case model.nav of
             DocumentsList ->
                 div [ class "flex justify-between" ]
-                    [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border border-green-lighter rounded-sm" ] [ viewFontAwesomeIcon "plus", text " New" ]
+                    [ button [ onClick NewDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "plus", text " New" ]
                     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
 
             Document index ->
-                div [ class "self-end flex-shrink flex items-center border border-green-lighter rounded-sm" ]
-                    [ button [ onClick BeginLoading, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "cloud-download-alt" ]
-                    , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
-                    , div [ class "py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (index + 1 |> toString) ]
-                    , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
-                    , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
+                div [ class "self-end flex-shrink flex items-center" ]
+                    [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
+                    , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-left" ]
+                    , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
+                    , button [ onClick GoToNextDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-right" ]
+                    , button [ onClick BeginLoading, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
                     ]
         ]
 
@@ -630,10 +630,12 @@ viewDocuments model =
                         [ titleHtml ]
                     ]
     in
-        div [ class "max-w-lg mx-auto flex-1" ]
-            [ div [ class "p-4" ] [ viewDocumentNavigation model ]
-            , div [ class "border-t border-blue-lighter" ]
-                (Array.indexedMap viewDocument model.documentSources |> Array.toList)
+        div [ class "flex-1 flex flex-col justify-center" ]
+            [ div [ class "" ] [ viewDocumentNavigation model ]
+            , div [ class "flex-1 w-full max-w-lg mx-auto flex-1" ]
+                [ div [ class "border-t border-blue-lighter" ]
+                    (Array.indexedMap viewDocument model.documentSources |> Array.toList)
+                ]
             ]
 
 
@@ -677,17 +679,21 @@ viewDocumentSource model documentSource =
                     "intro"
                     []
     in
-        div [ class "flex-1 flex flex-wrap h-screen" ]
-            [ div [ class "flex-1 min-w-full md:min-w-0" ]
-                [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
+        div [ class "flex-1 flex flex-col h-screen" ]
+            [ div [ class "flex bg-indigo-darkest" ]
+                [ viewDocumentNavigation model
                 ]
-            , div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
-                [ div [ class "flex mb-4" ]
-                    [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
-                    , viewDocumentNavigation model
+            , div [ class "flex-1 flex flex-wrap h-screen" ]
+                [ div [ class "flex-1 min-w-full md:min-w-0" ]
+                    [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
                     ]
-                , div [ class "pr-4" ] introHtml
-                , div [ class "pr-4" ] sectionsHtml
+                , div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
+                    [ div [ class "flex mb-4" ]
+                        [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
+                        ]
+                    , div [ class "pr-4" ] introHtml
+                    , div [ class "pr-4" ] sectionsHtml
+                    ]
                 ]
             ]
 
