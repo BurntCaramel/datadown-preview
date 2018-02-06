@@ -24,6 +24,7 @@ import Dict exposing (Dict(..))
 import Regex exposing (Regex)
 import Datadown exposing (Document, Section(..), Content(..))
 import JsonValue exposing (JsonValue)
+import Json.Decode
 
 
 {-| Error after processing, possibly from evaluating expressions
@@ -36,6 +37,7 @@ type Error e
     | Evaluate e
     | EvaluatingExpression String e
     | UnknownExpression
+    | DecodingJson String
     | Multiple (List (Error e))
 
 
@@ -117,7 +119,17 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         _ ->
                                             Just record.mainContent
                                 else
-                                    contentForKeyPathInResolvedSections record.subsections otherKeys
+                                    case record.mainContent of
+                                        [ Ok (Json json) ] ->
+                                            json
+                                                |> JsonValue.getIn otherKeys
+                                                |> Result.toMaybe
+                                                |> Maybe.map
+                                                    (Json >> Ok >> List.singleton)
+                                        
+                                        _ ->
+                                            otherKeys
+                                                |> contentForKeyPathInResolvedSections record.subsections
                             else
                                 Nothing
 
@@ -194,6 +206,16 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
 
                             Err error ->
                                 Err error
+                
+                Code (Just "json") jsonSource ->
+                    let
+                        jsonResult =
+                            jsonSource
+                                |> Json.Decode.decodeString JsonValue.decoder
+                    in
+                        jsonResult
+                            |> Result.map Json
+                            |> Result.mapError DecodingJson
 
                 Code language codeText ->
                     Ok (Code language (mustache resolveExpressionString codeText))
