@@ -37,6 +37,7 @@ type Section a
         , mainContent : List (Content a)
         , subsections : List (Section a)
         , inlineExpressions : Dict String a
+        , urls : List String
         }
 
 

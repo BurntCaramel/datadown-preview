@@ -7,6 +7,7 @@ import Time exposing (Time)
 import Date
 import Array exposing (Array)
 import Dict exposing (Dict)
+import Http
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
@@ -25,6 +26,7 @@ type alias Model =
     , nav : Nav
     , now : Time
     , sectionInputs : Dict String JsonValue
+    , loadedJson : Dict String (Maybe (Result Http.Error JsonValue))
     }
 
 
@@ -98,25 +100,55 @@ builtInValueFromModel model key =
 
 valueFromModel : Model -> String -> Maybe JsonValue
 valueFromModel model key =
+    let
+        keyPath =
+            key
+                |> String.split "."
+    in
+        
     case Dict.get key model.sectionInputs of
         Just value ->
             Just value
 
         Nothing ->
-            builtInValueFromModel model key
+            case keyPath of
+                [] ->
+                    Nothing
+                
+                firstKey :: otherKeys ->
+                    case Dict.get firstKey model.loadedJson of
+                        -- Has not begun loading
+                        Nothing ->
+                            builtInValueFromModel model key
+                        
+                        -- Has begun loading
+                        Just Nothing ->
+                            Just NullValue
+                        
+                        Just (Just result) ->
+                            result
+                                |> Result.mapError Process.Http
+                                |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Process.DecodingJson)
+                                |> Result.toMaybe
 
 
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
 evaluateExpressions model resolveFromDocument parsedExpressions =
     let
+        resolveWithModel : String -> Result (Process.Error Evaluate.Error) JsonValue
         resolveWithModel key =
             case resolveFromDocument key of
                 Ok value ->
                     Ok value
 
                 Err error ->
-                    valueFromModel model key
-                        |> Result.fromMaybe (Err error)
+                    case valueFromModel model key of
+                        Just value ->
+                            Ok value
+                        
+                        Nothing ->
+                            Err error
+                        
     in
         case parsedExpressions of
             Err error ->
@@ -167,6 +199,7 @@ init =
     , nav = Document 0
     , now = 0
     , sectionInputs = Dict.empty
+    , loadedJson = Dict.empty
     }
         ! [ Cmd.none
           ]
@@ -181,6 +214,8 @@ type Message
     | NewDocument
     | ChangeSectionInput String String
     | Time Time
+    | BeginLoading
+    | JsonLoaded String (Result Http.Error JsonValue)
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -263,12 +298,63 @@ update msg model =
                     StringValue newInput
 
                 newSectionInputs =
-                    Dict.insert sectionTitle newValue model.sectionInputs
+                    model.sectionInputs
+                        |> Dict.insert sectionTitle newValue
             in
                 ( { model | sectionInputs = newSectionInputs }, Cmd.none )
 
         Time time ->
             ( { model | now = time }, Cmd.none )
+
+        BeginLoading ->
+            let
+                maybeDocument : Maybe (Document (Result Error (List (List Token))))
+                maybeDocument =
+                    case model.nav of
+                        Document index ->
+                            Array.get index model.documentSources
+                                |> Maybe.map (parseDocument parseExpressions)
+                        _ ->
+                            Nothing
+                
+                urlsFromSection section =
+                    case section of
+                        Section { title, urls } ->
+                            case urls of
+                                [url] ->
+                                    Just (title, url)
+                                
+                                _ ->
+                                    Nothing
+                
+                urls =
+                    case maybeDocument of
+                        Just document ->
+                            document.sections
+                                |> List.filterMap urlsFromSection
+                                |> Debug.log "URLs to load"
+                        
+                        Nothing ->
+                            []
+                
+                loadJson (sectionTitle, url) =
+                    Http.get url JsonValue.decoder
+                        |> Http.send (JsonLoaded sectionTitle)
+                
+                commands =
+                    urls
+                        |> List.map loadJson
+                        |> Debug.log "Loading JSON"
+            in
+                ( model, Cmd.batch commands )
+
+        JsonLoaded url json ->
+            let
+                loadedJson =
+                    model.loadedJson
+                        |> Dict.insert url (Just json)
+            in
+                ( { model | loadedJson = loadedJson }, Cmd.none )
 
 
 subscriptions : Model -> Sub Message
@@ -493,7 +579,8 @@ viewDocumentNavigation model =
 
             Document index ->
                 div [ class "self-end flex-shrink flex items-center border border-green-lighter rounded-sm" ]
-                    [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
+                    [ button [ onClick BeginLoading, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "cloud-download-alt" ]
+                    , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
                     , div [ class "py-1 text-center font-bold text-green-dark bg-green-lightest" ] [ text (index + 1 |> toString) ]
                     , button [ onClick GoToNextDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-right" ]
                     , button [ onClick GoToDocumentsList, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "bars" ]
@@ -566,8 +653,8 @@ viewDocumentSource model documentSource =
             , sectionInputs = model.sectionInputs
             }
 
-        resultsHtml : List (Html Message)
-        resultsHtml =
+        sectionsHtml : List (Html Message)
+        sectionsHtml =
             resolved.sections
                 |> List.map makeSectionViewModel
                 |> List.map (viewSection [] displayOptions)
@@ -585,13 +672,13 @@ viewDocumentSource model documentSource =
                     "intro"
     in
         div [ class "flex-1 flex flex-wrap h-screen" ]
-            [ div [ class "flex-1 overflow-auto mb-8 p-4 pb-8 md:pl-6 leading-tight" ]
+            [ div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
                 [ div [ class "flex mb-4" ]
-                    [ h1 [ class "flex-1 text-3xl text-blue" ] [ text document.title ]
+                    [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
                     , viewDocumentNavigation model
                     ]
-                , div [] introHtml
-                , div [] resultsHtml
+                , div [ class "pr-4" ] introHtml
+                , div [ class "pr-4" ] sectionsHtml
                 ]
             , div [ class "flex-1 min-w-full md:min-w-0" ]
                 [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full h-full pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []

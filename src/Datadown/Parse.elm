@@ -37,7 +37,14 @@ listMustacheExpressions input =
             |> List.filterMap extractor
 
 
-processContentBlock : (String -> a) -> Block b i -> Maybe ( Content a, List ( String, a ) )
+type alias ProcessedInlines a =
+    { content : Content a
+    , expressionPairs : List ( String, a )
+    , urls : List String
+    }
+
+
+processContentBlock : (String -> a) -> Block b i -> Maybe (ProcessedInlines a)
 processContentBlock parseExpressions block =
     let
         maybeText =
@@ -50,22 +57,46 @@ processContentBlock parseExpressions block =
 
                 _ ->
                     Nothing
+        
+        urlFromInline inline =
+            case inline of
+                Link url maybeTitle innerInlines ->
+                    [url] |> Debug.log "Found url"
+                
+                _ ->
+                    []
+
+        urls =
+            case block of
+                PlainInlines inlines ->
+                    List.concatMap urlFromInline inlines
+
+                Paragraph rawText inlines ->
+                    List.concatMap urlFromInline inlines
+
+                _ ->
+                    []
     in
         case maybeText of
             Just text ->
                 let
+                    expressionPairs : List ( String, a )
                     expressionPairs =
                         listMustacheExpressions text
                             |> List.map (\s -> ( s, parseExpressions s ))
                 in
-                    Just ( Datadown.Text text, expressionPairs )
+                    { content = Datadown.Text text
+                    , expressionPairs = expressionPairs
+                    , urls = urls
+                    }
+                        |> Just
 
             Nothing ->
                 Nothing
 
 
-addContentToDocument : Content a -> List ( String, a ) -> Document a -> Document a
-addContentToDocument content expressions document =
+addContentToDocument : Content a -> List ( String, a ) -> List String -> Document a -> Document a
+addContentToDocument content expressions urls document =
     case document.sections of
         [] ->
             { document
@@ -82,6 +113,7 @@ addContentToDocument content expressions document =
                                 { sectionRecord
                                     | mainContent = content :: sectionRecord.mainContent
                                     , inlineExpressions = Dict.union sectionRecord.inlineExpressions (Dict.fromList expressions)
+                                    , urls = List.append sectionRecord.urls urls
                                 }
                     in
                         { document
@@ -95,6 +127,7 @@ addContentToDocument content expressions document =
                                 { subsectionRecord
                                     | mainContent = content :: subsectionRecord.mainContent
                                     , inlineExpressions = Dict.union subsectionRecord.inlineExpressions (Dict.fromList expressions)
+                                    , urls = List.append subsectionRecord.urls urls
                                 }
 
                         newSection =
@@ -134,6 +167,7 @@ sectionWithTitle title =
         , mainContent = []
         , subsections = []
         , inlineExpressions = Dict.empty
+        , urls = []
         }
 
 
@@ -167,20 +201,24 @@ processDocumentBlock parseExpressions block document =
 
         Block.List listBlock items ->
             let
-                contentAndExpressions : List ( Content a, List ( String, a ) )
+                contentAndExpressions : List (ProcessedInlines a)
                 contentAndExpressions =
                     List.map (List.filterMap (processContentBlock parseExpressions)) items
                         |> List.concat
 
                 contentItems =
                     contentAndExpressions
-                        |> List.map Tuple.first
+                        |> List.map .content
 
                 expressions =
                     contentAndExpressions
-                        |> List.concatMap Tuple.second
+                        |> List.concatMap .expressionPairs
+                
+                urls =
+                    contentAndExpressions
+                        |> List.concatMap .urls
             in
-                addContentToDocument (Datadown.List contentItems) expressions document
+                addContentToDocument (Datadown.List contentItems) expressions urls document
 
         BlockQuote blocks ->
             let
@@ -188,7 +226,7 @@ processDocumentBlock parseExpressions block document =
                 innerDocument =
                     processDocument parseExpressions blocks
             in
-                addContentToDocument (Datadown.Quote innerDocument) [] document
+                addContentToDocument (Datadown.Quote innerDocument) [] [] document
 
         CodeBlock codeBlock text ->
             let
@@ -209,12 +247,12 @@ processDocumentBlock parseExpressions block document =
                         _ ->
                             ( Code Nothing text, expressionPairsFor text )
             in
-                addContentToDocument content expressionPairs document
+                addContentToDocument content expressionPairs [] document
 
         _ ->
             case processContentBlock parseExpressions block of
-                Just ( content, expressions ) ->
-                    addContentToDocument content expressions document
+                Just { content, expressionPairs, urls } ->
+                    addContentToDocument content expressionPairs urls document
 
                 Nothing ->
                     document

@@ -25,6 +25,7 @@ import Regex exposing (Regex)
 import Datadown exposing (Document, Section(..), Content(..))
 import JsonValue exposing (JsonValue)
 import Json.Decode
+import Http
 
 
 {-| Error after processing, possibly from evaluating expressions
@@ -38,6 +39,7 @@ type Error e
     | EvaluatingExpression String e
     | UnknownExpression
     | DecodingJson String
+    | Http Http.Error
     | Multiple (List (Error e))
 
 
@@ -119,6 +121,10 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         _ ->
                                             Just record.mainContent
                                 else
+                                    let
+                                        _ = Debug.log "other keys" (otherKeys, record.mainContent)
+                                    in
+                                        
                                     case record.mainContent of
                                         [ Ok (Json json) ] ->
                                             json
@@ -126,7 +132,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                                 |> Result.toMaybe
                                                 |> Maybe.map
                                                     (Json >> Ok >> List.singleton)
-                                        
+
                                         _ ->
                                             otherKeys
                                                 |> contentForKeyPathInResolvedSections record.subsections
@@ -206,7 +212,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
 
                             Err error ->
                                 Err error
-                
+
                 Code (Just "json") jsonSource ->
                     let
                         jsonResult =
@@ -326,6 +332,7 @@ processDocument evaluateExpression contentToJson document =
                         , mainContent = document.introContent
                         , subsections = []
                         , inlineExpressions = document.introInlineExpressions
+                        , urls = []
                         }
             in
                 nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
