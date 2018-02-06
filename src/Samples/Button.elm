@@ -1,8 +1,9 @@
-module Samples.Button
-    exposing (source)
+module Samples.Button exposing (source)
+
 
 source : String
-source = """# Button
+source =
+    """# Button
 
 A button similar to Bootstrap 4’s.
 

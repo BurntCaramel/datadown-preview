@@ -73,7 +73,7 @@ addContentToDocument content expressions document =
                 , introInlineExpressions = Dict.union document.introInlineExpressions (Dict.fromList expressions)
             }
 
-        Section sectionRecord :: sectionsTail ->
+        (Section sectionRecord) :: sectionsTail ->
             case sectionRecord.subsections of
                 [] ->
                     let
@@ -88,7 +88,7 @@ addContentToDocument content expressions document =
                             | sections = newSection :: sectionsTail
                         }
 
-                Section subsectionRecord :: subsectionsTail ->
+                (Section subsectionRecord) :: subsectionsTail ->
                     let
                         newSubsection =
                             Section
@@ -96,7 +96,7 @@ addContentToDocument content expressions document =
                                     | mainContent = content :: subsectionRecord.mainContent
                                     , inlineExpressions = Dict.union subsectionRecord.inlineExpressions (Dict.fromList expressions)
                                 }
-                        
+
                         newSection =
                             Section
                                 { sectionRecord
@@ -114,7 +114,7 @@ addSubsectionToDocument subsection document =
         [] ->
             document
 
-        Section section :: sectionsTail ->
+        (Section section) :: sectionsTail ->
             let
                 newSection =
                     Section
@@ -154,7 +154,7 @@ processDocumentBlock parseExpressions block document =
                 { document
                     | sections = (sectionWithTitle title) :: document.sections
                 }
-        
+
         Heading text 3 inlines ->
             let
                 title : String
@@ -229,20 +229,21 @@ processDocument parseExpressions blocks =
             , introInlineExpressions = Dict.empty
             , sections = []
             }
-        
+
         postSection section =
             case section of
                 Section record ->
                     Section
                         { record
-                        | mainContent = List.reverse record.mainContent
+                            | mainContent = List.reverse record.mainContent
                         }
-        
+
         postDocument document =
             { document
-            | sections = document.sections
-                |> List.map postSection
-                |> List.reverse 
+                | sections =
+                    document.sections
+                        |> List.map postSection
+                        |> List.reverse
             }
     in
         blocks

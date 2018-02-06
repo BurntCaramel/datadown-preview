@@ -31,8 +31,8 @@ type Content a
 
 {-| A section of data
 -}
-type Section a =
-    Section
+type Section a
+    = Section
         { title : String
         , mainContent : List (Content a)
         , subsections : List (Section a)

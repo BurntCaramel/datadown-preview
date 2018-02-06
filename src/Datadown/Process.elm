@@ -40,15 +40,16 @@ type Error e
 
 
 type alias Resolved e a =
-    { sections : List (String, ResolvedSection (Error e) a)
-    , intro: List (Result (Error e) (Content a))
+    { sections : List ( String, ResolvedSection (Error e) a )
+    , intro : List (Result (Error e) (Content a))
     , tests : List (Document a)
     }
 
-type ResolvedSection e a =
-    ResolvedSection
+
+type ResolvedSection e a
+    = ResolvedSection
         { mainContent : List (Result e (Content a))
-        , subsections : List (String, ResolvedSection e a)
+        , subsections : List ( String, ResolvedSection e a )
         }
 
 
@@ -65,15 +66,18 @@ jsonToString json =
 
         JsonValue.NumericValue f ->
             toString f
-        
+
         -- TODO: turn to real Markdown?
         JsonValue.ArrayValue items ->
             items
                 |> List.map jsonToString
                 |> String.join "\n"
-        
+
         JsonValue.BoolValue bool ->
-            if bool then "👍" else "👎"
+            if bool then
+                "👍"
+            else
+                "👎"
 
         _ ->
             toString json
@@ -116,13 +120,13 @@ contentForKeyInResults results key =
         |> Maybe.map Tuple.second
 
 
-contentForKeyPathInResolvedSections : List (String, ResolvedSection (Error e) a) -> List String -> Maybe (List (Result (Error e) (Content a)))
+contentForKeyPathInResolvedSections : List ( String, ResolvedSection (Error e) a ) -> List String -> Maybe (List (Result (Error e) (Content a)))
 contentForKeyPathInResolvedSections resolvedSections keyPath =
     case keyPath of
         firstKey :: otherKeys ->
             let
-                findContentInSection : (String, ResolvedSection (Error e) a) -> Maybe (List (Result (Error e) (Content a)))
-                findContentInSection (key, resolvedSection) =
+                findContentInSection : ( String, ResolvedSection (Error e) a ) -> Maybe (List (Result (Error e) (Content a)))
+                findContentInSection ( key, resolvedSection ) =
                     case resolvedSection of
                         ResolvedSection record ->
                             if key == firstKey then
@@ -133,7 +137,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
 
                                         _ ->
                                             Just record.mainContent
-                                else    
+                                else
                                     contentForKeyPathInResolvedSections record.subsections otherKeys
                             else
                                 Nothing
@@ -142,19 +146,17 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                     case resolvedSections of
                         [] ->
                             Nothing
-                        
+
                         head :: tail ->
                             case findContentInSection head of
                                 Just content ->
                                     Just content
-                                
+
                                 Nothing ->
                                     findInSections tail
-                        
             in
                 findInSections resolvedSections
-                
-        
+
         [] ->
             Nothing
 
@@ -171,7 +173,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
         expressionForString s =
             section.inlineExpressions
                 |> Dict.get s
-        
+
         valueForIdentifier id =
             valueListForIdentifier id
                 |> Result.map (JsonValue.ArrayValue)
@@ -180,7 +182,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
         resolveExpressionString s =
             expressionForString s
                 |> Maybe.andThen (evaluateExpression valueForIdentifier >> Result.toMaybe)
-        
+
         processContent content =
             case content of
                 Text text ->
@@ -195,13 +197,13 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
                                     case processContent item of
                                         Ok processedItem ->
                                             Ok (processedItem :: items)
-                                        
+
                                         Err error ->
                                             Err error
 
                                 Err error ->
                                     Err error
-                        
+
                         processedItems =
                             contentItems
                                 |> List.foldl reduceItem (Ok [])
@@ -210,7 +212,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
                         case processedItems of
                             Ok items ->
                                 Ok (List items)
-                            
+
                             Err error ->
                                 Err error
 
@@ -227,7 +229,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
 
                 content ->
                     Ok content
-        
+
         processNextContent content results =
             (processContent content) :: results
     in
@@ -239,15 +241,15 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
 flattenResults : List (Result e a) -> Result e (List a)
 flattenResults inItems =
     case inItems of
-        Ok c :: tail ->
+        (Ok c) :: tail ->
             case flattenResults tail of
-                Ok d  ->
+                Ok d ->
                     Ok (c :: d)
-            
+
                 Err e ->
                     Err e
 
-        Err e :: tail ->
+        (Err e) :: tail ->
             Err e
 
         [] ->
@@ -280,7 +282,7 @@ foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResult
             case sectionWrapper of
                 Section section ->
                     section.title
-        
+
         subsections =
             case sectionWrapper of
                 Section section ->
@@ -289,12 +291,12 @@ foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResult
         resolvedMainContent : List (Result (Error e) (Content a))
         resolvedMainContent =
             nextProcessedSection evaluateExpression contentToJson sectionWrapper prevResults
-        
+
         resolvedSubsections =
             subsections
                 |> List.foldl (foldProcessedSections evaluateExpression contentToJson) prevResults
                 |> List.take (List.length subsections)
-        
+
         resolvedSection =
             ResolvedSection
                 { mainContent = resolvedMainContent
@@ -314,7 +316,7 @@ processDocument evaluateExpression contentToJson document =
             document.sections
                 |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []
                 |> List.reverse
-                
+
         resolvedIntro =
             let
                 introSection =
@@ -327,7 +329,6 @@ processDocument evaluateExpression contentToJson document =
             in
                 nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
                     |> List.reverse
-
     in
         { sections = resolvedSections
         , intro = resolvedIntro

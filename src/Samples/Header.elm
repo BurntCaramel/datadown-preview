@@ -1,8 +1,9 @@
-module Samples.Data
-    exposing (source)
+module Samples.Data exposing (source)
+
 
 source : String
-source = """# Header
+source =
+    """# Header
 
 ## firstName
 Jane!

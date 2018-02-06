@@ -1,8 +1,9 @@
-module Samples.Welcome
-    exposing (source)
+module Samples.Welcome exposing (source)
+
 
 source : String
-source = """# Welcome to Datadown
+source =
+    """# Welcome to Datadown
 
 ## what
 

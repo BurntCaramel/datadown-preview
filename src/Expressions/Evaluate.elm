@@ -42,7 +42,7 @@ toFloat value =
             s
                 |> String.toFloat
                 |> Result.toMaybe
-        
+
         ArrayValue (item :: []) ->
             toFloat item
 
@@ -121,28 +121,27 @@ processOperator op a b =
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
-        
+
         Math function ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
-                    Ok <| NumericValue <|
-                        case function of
-                            Sine ->
-                                a * (sin b)
+                    Ok <|
+                        NumericValue <|
+                            case function of
+                                Sine ->
+                                    a * (sin b)
 
-                            Cosine ->
-                                a * (cos b)
-                            
-                            Tangent ->
-                                a * (tan b)
-                            
-                            Turns ->
-                                a * (turns b)
+                                Cosine ->
+                                    a * (cos b)
 
+                                Tangent ->
+                                    a * (tan b)
+
+                                Turns ->
+                                    a * (turns b)
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
-
 
 
 valueOperatorOnList : Operator -> JsonValue -> List JsonValue -> Result Error JsonValue

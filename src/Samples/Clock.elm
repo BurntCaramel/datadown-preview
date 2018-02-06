@@ -1,8 +1,9 @@
-module Samples.Clock
-    exposing (source)
+module Samples.Clock exposing (source)
+
 
 source : String
-source = """# Clock
+source =
+    """# Clock
 
 ```svg
 {{ clock }}

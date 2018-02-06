@@ -57,13 +57,12 @@ type Token
     | Operator Operator
 
 
+
 -- type Type
 --     = Float
 --     | String
 --     | Bool
 --     | Unknown
-
-
 -- type Expression t
 --     = Get String t
 --     | Use JsonValue
@@ -78,9 +77,10 @@ isIdentifierTailChar c =
     Char.isLower c
         || Char.isUpper c
         || Char.isDigit c
-        || c == '.'
-        || c == '_'
-        
+        || c
+        == '.'
+        || c
+        == '_'
 
 
 identifier : Parser Token

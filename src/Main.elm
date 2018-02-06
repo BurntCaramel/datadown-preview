@@ -65,29 +65,33 @@ builtInValueFromModel model key =
                 |> Time.inSeconds
                 |> floor
                 |> toFloat
-                |> JsonValue.NumericValue >> Just
-        
+                |> JsonValue.NumericValue
+                >> Just
+
         "now.date.s" ->
             model.now
                 |> Date.fromTime
                 |> Date.second
                 |> toFloat
-                |> JsonValue.NumericValue >> Just
-        
+                |> JsonValue.NumericValue
+                >> Just
+
         "now.date.m" ->
             model.now
                 |> Date.fromTime
                 |> Date.minute
                 |> toFloat
-                |> JsonValue.NumericValue >> Just
-        
+                |> JsonValue.NumericValue
+                >> Just
+
         "now.date.h" ->
             model.now
                 |> Date.fromTime
                 |> Date.hour
                 |> toFloat
-                |> JsonValue.NumericValue >> Just
-        
+                |> JsonValue.NumericValue
+                >> Just
+
         _ ->
             Nothing
 
@@ -97,7 +101,7 @@ valueFromModel model key =
     case Dict.get key model.sectionInputs of
         Just value ->
             Just value
-        
+
         Nothing ->
             builtInValueFromModel model key
 
@@ -109,18 +113,17 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
             case resolveFromDocument key of
                 Ok value ->
                     Ok value
-                
+
                 Err error ->
                     valueFromModel model key
                         |> Result.fromMaybe (Err error)
     in
-        
-    case parsedExpressions of
-        Err error ->
-            Err Evaluate.Parsing
+        case parsedExpressions of
+            Err error ->
+                Err Evaluate.Parsing
 
-        Ok expressions ->
-            evaulateTokenLines resolveWithModel expressions
+            Ok expressions ->
+                evaulateTokenLines resolveWithModel expressions
 
 
 contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
@@ -139,13 +142,13 @@ contentToJson model content =
 
                 _ ->
                     Err Evaluate.CannotConvertToJson
-        
+
         List items ->
             items
                 |> List.filterMap ((contentToJson model) >> Result.toMaybe)
                 |> JsonValue.ArrayValue
                 |> Ok
-        
+
         Code maybeLanguage source ->
             Ok <| JsonValue.StringValue <| String.trim source
 
@@ -190,52 +193,52 @@ update msg model =
                         Document index ->
                             model.documentSources
                                 |> Array.set index newInput
-                    
+
                         _ ->
                             model.documentSources
             in
                 ( { model | documentSources = documentSources }, Cmd.none )
-        
+
         GoToDocumentsList ->
             ( { model | nav = DocumentsList }, Cmd.none )
-        
+
         GoToPreviousDocument ->
             let
                 newIndex =
                     case model.nav of
                         DocumentsList ->
                             0
-                        
+
                         Document index ->
                             max 0 (index - 1)
             in
                 ( { model | nav = Document newIndex }, Cmd.none )
-        
+
         GoToNextDocument ->
             let
                 maxIndex =
                     Array.length model.documentSources - 1
-                
+
                 newIndex =
                     case model.nav of
                         DocumentsList ->
                             maxIndex
-                        
+
                         Document index ->
                             min maxIndex (index + 1)
             in
                 ( { model | nav = Document newIndex }, Cmd.none )
-        
+
         GoToDocumentAtIndex index ->
             ( { model | nav = Document index }, Cmd.none )
-        
+
         NewDocument ->
             let
                 currentIndex =
                     case model.nav of
                         DocumentsList ->
                             0
-                        
+
                         Document index ->
                             index
 
@@ -245,10 +248,10 @@ update msg model =
                 prefix =
                     Array.slice 0 currentIndex model.documentSources
                         |> Array.push newDocumentSource
-                
+
                 suffix =
                     Array.slice currentIndex (Array.length model.documentSources) model.documentSources
-                
+
                 documentSources =
                     Array.append prefix suffix
             in
@@ -258,12 +261,11 @@ update msg model =
             let
                 newValue =
                     StringValue newInput
-                
+
                 newSectionInputs =
                     Dict.insert sectionTitle newValue model.sectionInputs
             in
                 ( { model | sectionInputs = newSectionInputs }, Cmd.none )
-                
 
         Time time ->
             ( { model | now = time }, Cmd.none )
@@ -329,7 +331,7 @@ viewCode options language source =
         if not options.compact && showCodeForLanguage language then
             div []
                 [ previewHtml
-                , details [ class "mt-2" ] 
+                , details [ class "mt-2" ]
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
                         [ text "Source" ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
@@ -402,7 +404,8 @@ viewContentResults options parentPath sectionTitle contentResults =
                             |> Maybe.withDefault ""
 
                     key =
-                        baseTitle :: parentPath
+                        baseTitle
+                            :: parentPath
                             |> List.reverse
                             |> String.join "."
 
@@ -410,10 +413,10 @@ viewContentResults options parentPath sectionTitle contentResults =
                         case Dict.get key options.sectionInputs of
                             Nothing ->
                                 ""
-                            
+
                             Just (StringValue s) ->
                                 s
-                            
+
                             json ->
                                 toString json
                 in
@@ -428,7 +431,7 @@ viewContentResults options parentPath sectionTitle contentResults =
 type alias SectionViewModel e =
     { title : String
     , mainContent : List (Result e (Content (Result Error (List (List Token)))))
-    , subsections : List (String, ResolvedSection e (Result Error (List (List Token))))
+    , subsections : List ( String, ResolvedSection e (Result Error (List (List Token))) )
     }
 
 
@@ -444,13 +447,13 @@ viewSectionTitle level =
     case level of
         0 ->
             h2 [ class "mb-2 text-xl text-blue-dark" ]
-        
+
         1 ->
             h3 [ class "mb-2 text-lg text-blue-dark" ]
-        
+
         2 ->
             h4 [ class "mb-2 text-base text-blue-dark" ]
-        
+
         _ ->
             h4 [ class "mb-2 text-sm text-blue-dark" ]
 
@@ -487,7 +490,7 @@ viewDocumentNavigation model =
                     [ button [ onClick NewDocument, class "px-2 py-1 text-green-dark bg-green-lightest border border-green-lighter rounded-sm" ] [ viewFontAwesomeIcon "plus", text " New" ]
                     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
-            
+
             Document index ->
                 div [ class "self-end flex-shrink flex items-center border border-green-lighter rounded-sm" ]
                     [ button [ onClick GoToPreviousDocument, class "px-2 py-1 text-green-dark bg-green-lightest" ] [ viewFontAwesomeIcon "arrow-left" ]
@@ -508,16 +511,22 @@ viewDocuments model =
                         |> String.trim
                         |> String.lines
                         |> List.head
-                
+
                 maybeTitle =
                     Maybe.map (parseDocument parseExpressions >> .title) firstLine
-                        |> Maybe.andThen (\line -> if String.isEmpty line then Nothing else Just line)
-                
+                        |> Maybe.andThen
+                            (\line ->
+                                if String.isEmpty line then
+                                    Nothing
+                                else
+                                    Just line
+                            )
+
                 titleHtml =
                     case maybeTitle of
                         Just input ->
                             text input
-                        
+
                         Nothing ->
                             em [] [ text "Untitled" ]
 
@@ -542,14 +551,14 @@ viewDocumentSource model documentSource =
         document : Document (Result Error (List (List Token)))
         document =
             parseDocument parseExpressions documentSource
-        
+
         processDocument_ =
             processDocument (evaluateExpressions model) (contentToJson model)
 
         resolved : Resolved Evaluate.Error (Result Error (List (List Token)))
         resolved =
             processDocument_ document
-        
+
         displayOptions =
             { compact = False
             , hideNoContent = False
@@ -562,7 +571,7 @@ viewDocumentSource model documentSource =
             resolved.sections
                 |> List.map makeSectionViewModel
                 |> List.map (viewSection [] displayOptions)
-        
+
         introHtml : List (Html Message)
         introHtml =
             resolved.intro
@@ -596,11 +605,12 @@ view model =
         [ case model.nav of
             DocumentsList ->
                 viewDocuments model
-            
+
             Document index ->
                 Array.get index model.documentSources
                     |> Maybe.map (viewDocumentSource model)
                     |> Maybe.withDefault (div [] [ text "No document" ])
+
         -- , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
         --     [ button [ class "px-2 py-1 text-purple-lightest bg-purple" ] [ text "Edit" ]
         --     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest" ] [ text "Test" ]
