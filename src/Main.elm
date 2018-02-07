@@ -13,9 +13,8 @@ import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
+import Preview
 import Preview.Json
-import Preview.Html
-import Preview.Markdown
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
@@ -390,35 +389,15 @@ showCodeForLanguage language =
         _ ->
             True
 
-
-viewCodePreview : Maybe String -> String -> List (Html Message)
-viewCodePreview language source =
-    case language of
-        Just "html" ->
-            [ Preview.Html.view False source ]
-
-        Just "svg" ->
-            [ Preview.Html.view True source ]
-
-        Just "json" ->
-            [ Preview.Json.view source ]
-        
-        Just "markdown" ->
-            [ Preview.Markdown.view source ]
-
-        _ ->
-            [ text (language |> Maybe.withDefault "none") ]
-
-
 viewCode : DisplayOptions -> Maybe String -> String -> Html Message
 viewCode options language source =
     let
         previewHtml =
-            div [] (viewCodePreview language source)
+            Preview.view language source
     in
         if not options.compact && showCodeForLanguage language then
             div []
-                [ previewHtml
+                [ div [] [ previewHtml ]
                 , details [ class "mt-2" ]
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
                         [ text "Source" ]
