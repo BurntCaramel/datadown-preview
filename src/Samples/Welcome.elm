@@ -11,7 +11,7 @@ Make interactive elements using Markdown. Prototype HTML and SVG, and export as 
 
 ## why
 
-Edit live. No installation or config. Mobile friendly. Upcoming support for multiple platforms.
+Edit live. No installation or config. Mobile friendly.
 
 ## what.svg
 ```svg
