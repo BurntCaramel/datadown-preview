@@ -18,6 +18,10 @@ summary {
 summary::-webkit-details-marker {
   display: none;
 }
+/* Section titles when collapsed */
+details:not([open]) > summary > h2:after {
+  content: '…'
+}
 
 .bg-purple-o-10 {
   background-color: #9561e214;
