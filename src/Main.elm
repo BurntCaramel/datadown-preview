@@ -15,6 +15,7 @@ import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview.Json
 import Preview.Html
+import Preview.Markdown
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
@@ -401,6 +402,9 @@ viewCodePreview language source =
 
         Just "json" ->
             [ Preview.Json.view source ]
+        
+        Just "markdown" ->
+            [ Preview.Markdown.view source ]
 
         _ ->
             [ text (language |> Maybe.withDefault "none") ]
