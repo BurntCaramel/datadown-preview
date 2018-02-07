@@ -21,9 +21,32 @@ import Samples.Welcome
 import Samples.Clock
 
 
+type EditMode
+    = Off
+    | WithPreview
+    | Only
+
+
+editModeFromInt : Int -> Maybe EditMode
+editModeFromInt int =
+    case int of
+        0 ->
+            Just Off
+        
+        1 ->
+            Just WithPreview
+        
+        2 ->
+            Just Only
+        
+        _ ->
+            Nothing
+
+
 type alias Model =
     { documentSources : Array String
     , nav : Nav
+    , editMode : EditMode
     , now : Time
     , sectionInputs : Dict String JsonValue
     , loadedJson : Dict String (Maybe (Result Http.Error JsonValue))
@@ -188,8 +211,13 @@ contentToJson model content =
             Err Evaluate.CannotConvertToJson
 
 
-init : ( Model, Cmd Message )
-init =
+type alias Flags =
+  { editModeInt : Maybe Int
+  }
+
+
+init : Flags -> ( Model, Cmd Message )
+init flags =
     { documentSources =
         [ Samples.Welcome.source
         , Samples.Clock.source
@@ -197,6 +225,9 @@ init =
         ]
             |> Array.fromList
     , nav = Document 0
+    , editMode = flags.editModeInt
+        |> Maybe.andThen editModeFromInt
+        |> Maybe.withDefault WithPreview
     , now = 0
     , sectionInputs = Dict.empty
     , loadedJson = Dict.empty
@@ -630,8 +661,8 @@ viewDocuments model =
             ]
 
 
-viewDocumentSource : Model -> String -> Html Message
-viewDocumentSource model documentSource =
+viewDocumentPreview : Model -> String -> Html Message
+viewDocumentPreview model documentSource =
     let
         document : Document (Result Error (List (List Token)))
         document =
@@ -670,21 +701,43 @@ viewDocumentSource model documentSource =
                     "intro"
                     []
     in
+        div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
+            [ div [ row, class "mb-4" ]
+                [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
+                ]
+            , div [ class "pr-4" ] introHtml
+            , div [ class "pr-4" ] sectionsHtml
+            ]
+
+
+viewDocumentSource : Model -> String -> Html Message
+viewDocumentSource model documentSource =
+    let
+        editorHtml =
+            case model.editMode of
+                Off ->
+                    text ""
+                
+                _ ->
+                    div [ class "flex-1 min-w-full md:min-w-0" ]
+                        [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
+                        ]
+        
+        previewHtml =
+            case model.editMode of
+                Only ->
+                    text ""
+                
+                _ ->
+                    viewDocumentPreview model documentSource
+    in
         div [ col, class "flex-1 h-screen" ]
             [ div [ row, class "mb-8 bg-indigo-darkest" ]
                 [ viewDocumentNavigation model
                 ]
             , div [ row, class "flex-1 flex-wrap h-screen" ]
-                [ div [ class "flex-1 min-w-full md:min-w-0" ]
-                    [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
-                    ]
-                , div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
-                    [ div [ row, class "mb-4" ]
-                        [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
-                        ]
-                    , div [ class "pr-4" ] introHtml
-                    , div [ class "pr-4" ] sectionsHtml
-                    ]
+                [ editorHtml
+                , previewHtml
                 ]
             ]
 
@@ -709,9 +762,9 @@ view model =
         ]
 
 
-main : Program Never Model Message
+main : Program Flags Model Message
 main =
-    program
+    programWithFlags
         { init = init
         , view = view
         , update = update
