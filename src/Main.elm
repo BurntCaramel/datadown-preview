@@ -332,7 +332,6 @@ update msg model =
                         Just document ->
                             document.sections
                                 |> List.filterMap urlsFromSection
-                                |> Debug.log "URLs to load"
                         
                         Nothing ->
                             []
@@ -344,15 +343,14 @@ update msg model =
                 commands =
                     urls
                         |> List.map loadJson
-                        |> Debug.log "Loading JSON"
             in
                 ( model, Cmd.batch commands )
 
-        JsonLoaded url json ->
+        JsonLoaded key json ->
             let
                 loadedJson =
                     model.loadedJson
-                        |> Dict.insert url (Just json)
+                        |> Dict.insert key (Just json)
             in
                 ( { model | loadedJson = loadedJson }, Cmd.none )
 
