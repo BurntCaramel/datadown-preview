@@ -565,16 +565,16 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "fixed w-full bg-indigo-darkest", class "bg-red" ]
+    div [ class "fixed w-full h-8 bg-indigo-darkest", class "bg-red" ]
         [ case model.nav of
             DocumentsList ->
-                div [ row, class "justify-between" ]
+                div [ row, class "h-8 justify-between" ]
                     [ button [ onClick NewDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "plus", text " New" ]
                     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
 
             Document index ->
-                div [ row, class "self-end flex-shrink items-center" ]
+                div [ row, class "h-8 self-end flex-shrink items-center" ]
                     [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
                     , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-left" ]
                     , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
@@ -622,7 +622,7 @@ viewDocuments model =
                     ]
     in
         div [ col, class "flex-1 justify-center" ]
-            [ div [ class "" ] [ viewDocumentNavigation model ]
+            [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
             , div [ class "flex-1 w-full max-w-lg mx-auto" ]
                 [ div [ class "border-t border-blue-lighter" ]
                     (Array.indexedMap viewDocument model.documentSources |> Array.toList)
@@ -671,7 +671,7 @@ viewDocumentSource model documentSource =
                     []
     in
         div [ col, class "flex-1 h-screen" ]
-            [ div [ row, class "bg-indigo-darkest" ]
+            [ div [ row, class "mb-8 bg-indigo-darkest" ]
                 [ viewDocumentNavigation model
                 ]
             , div [ row, class "flex-1 flex-wrap h-screen" ]
