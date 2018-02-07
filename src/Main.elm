@@ -362,6 +362,16 @@ subscriptions model =
         ]
 
 
+row : Html.Attribute msg
+row =
+    class "flex flex-row"
+
+
+col : Html.Attribute msg
+col =
+    class "flex flex-col"
+
+
 viewExpressionToken : Token -> Html Message
 viewExpressionToken token =
     case token of
@@ -555,16 +565,16 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "bg-indigo-darkest" ]
+    div [ class "fixed w-full bg-indigo-darkest", class "bg-red" ]
         [ case model.nav of
             DocumentsList ->
-                div [ class "flex justify-between" ]
+                div [ row, class "justify-between" ]
                     [ button [ onClick NewDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "plus", text " New" ]
                     , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
 
             Document index ->
-                div [ class "self-end flex-shrink flex items-center" ]
+                div [ row, class "self-end flex-shrink items-center" ]
                     [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
                     , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-left" ]
                     , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
@@ -611,9 +621,9 @@ viewDocuments model =
                         [ titleHtml ]
                     ]
     in
-        div [ class "flex-1 flex flex-col justify-center" ]
+        div [ col, class "flex-1 justify-center" ]
             [ div [ class "" ] [ viewDocumentNavigation model ]
-            , div [ class "flex-1 w-full max-w-lg mx-auto flex-1" ]
+            , div [ class "flex-1 w-full max-w-lg mx-auto" ]
                 [ div [ class "border-t border-blue-lighter" ]
                     (Array.indexedMap viewDocument model.documentSources |> Array.toList)
                 ]
@@ -660,16 +670,16 @@ viewDocumentSource model documentSource =
                     "intro"
                     []
     in
-        div [ class "flex-1 flex flex-col h-screen" ]
-            [ div [ class "flex bg-indigo-darkest" ]
+        div [ col, class "flex-1 h-screen" ]
+            [ div [ row, class "bg-indigo-darkest" ]
                 [ viewDocumentNavigation model
                 ]
-            , div [ class "flex-1 flex flex-wrap h-screen" ]
+            , div [ row, class "flex-1 flex-wrap h-screen" ]
                 [ div [ class "flex-1 min-w-full md:min-w-0" ]
                     [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
                     ]
                 , div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
-                    [ div [ class "flex mb-4" ]
+                    [ div [ row, class "mb-4" ]
                         [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
                         ]
                     , div [ class "pr-4" ] introHtml
