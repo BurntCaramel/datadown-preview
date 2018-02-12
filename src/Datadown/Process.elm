@@ -466,8 +466,7 @@ defaultEvaluateComponent element =
                     , if primary then "bg-blue-light" else "bg-grey-light"
                     ] |> String.join " "
             in
-                
-            Ok <| Code (Just "html") <| "<button class=\"" ++ class ++ "\">" ++ content ++ "</button>"
+                Ok <| Code (Just "html") <| "<button class=\"" ++ class ++ "\">" ++ content ++ "</button>"
 
         "orange-button" ->
             Ok <| Code (Just "html") """<button class="bg-orange-light px-2 py-1 rounded">Click me</button>
