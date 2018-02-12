@@ -1,6 +1,8 @@
 module Datadown.Process
     exposing
-        ( processDocument
+        ( processDocumentWith
+        , processDocument
+        , processComponent
         , Error(..)
         , Resolved
         , ResolvedSection(..)
@@ -57,9 +59,32 @@ type ResolvedSection e a
         }
 
 
+type alias CustomElement =
+    { language : Maybe String
+    , componentName : String
+    , props : List (String, JsonValue)
+    }
+
+
 mustacheVariableRegex : Regex
 mustacheVariableRegex =
     Regex.regex "{{([^}]*)}}"
+
+
+customElementOpenRegex : Regex
+customElementOpenRegex =
+    Regex.regex "<([A-Z]\\w*)([^>]*)>(.+)"
+
+
+attributeRegex : Regex
+attributeRegex =
+    Regex.regex "\\s*(\\w[^=\"\\s]+)(?:=\"(\\w*)\")?"
+
+
+customElementCloseRegex : String -> Regex
+customElementCloseRegex name =
+    "</" ++ (Regex.escape name) ++ ">"
+        |> Regex.regex
 
 
 jsonToString : JsonValue -> String
@@ -87,8 +112,74 @@ jsonToString json =
             toString json
 
 
-mustache : (String -> Maybe JsonValue) -> String -> String
-mustache resolveVariable input =
+matchToAttribute : Regex.Match -> Maybe (String, JsonValue)
+matchToAttribute match =
+    case match.submatches of
+        Just key :: Just value :: [] ->
+            Just (key, JsonValue.StringValue value)
+        
+        Just key :: Nothing :: [] ->
+            Just (key, JsonValue.BoolValue True)
+        
+        _ ->
+            Nothing
+
+
+processCustomElements : (CustomElement -> Result (Error e) (Content a)) -> String -> String
+processCustomElements evaluateComponent input =
+    let
+        replacer : Regex.Match -> String
+        replacer match =
+            case match.submatches of
+                Just componentName :: maybeAttributesSource :: maybeContent :: [] ->
+                    let
+                        props =
+                            case maybeAttributesSource of
+                                Just source ->
+                                    source
+                                        |> Regex.find Regex.All attributeRegex
+                                        |> List.filterMap matchToAttribute
+
+                                Nothing ->
+                                    []
+
+                        (customElement, rest) =
+                            case maybeContent of
+                                Just content ->
+                                    case Regex.split (Regex.AtMost 1) (customElementCloseRegex componentName) content of
+                                        childrenSource :: rest :: [] ->
+                                            (CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue childrenSource)]), rest)
+                                        
+                                        childrenSource :: [] ->
+                                            (CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue childrenSource)]), "")
+                                        
+                                        _ ->
+                                            (CustomElement Nothing componentName props, "")
+                                
+                                Nothing ->
+                                    (CustomElement Nothing componentName props, "")
+                        
+                        result =
+                            evaluateComponent customElement
+                    in
+                        case result of
+                            Ok (Code maybeLanguage source) ->
+                                source
+                            
+                            Ok _ ->
+                                ""
+                            
+                            Err error ->
+                                (toString error)
+                
+                _ ->
+                    "?"
+    in
+        Regex.replace (Regex.AtMost 1) customElementOpenRegex replacer input
+
+
+mustache : (CustomElement -> Result (Error e) (Content a)) -> (String -> Maybe JsonValue) -> String -> String
+mustache evaluateComponent resolveVariable input =
     let
         replacer : Regex.Match -> String
         replacer match =
@@ -100,7 +191,9 @@ mustache resolveVariable input =
                 |> Maybe.map jsonToString
                 |> Maybe.withDefault "?"
     in
-        Regex.replace Regex.All mustacheVariableRegex replacer input
+        input
+            |> processCustomElements evaluateComponent
+            |> Regex.replace Regex.All mustacheVariableRegex replacer
 
 
 contentForKeyPathInResolvedSections : List ( String, ResolvedSection (Error e) a ) -> List String -> Maybe (List (Result (Error e) (Content a)))
@@ -121,10 +214,6 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         _ ->
                                             Just record.mainContent
                                 else
-                                    let
-                                        _ = Debug.log "other keys" (otherKeys, record.mainContent)
-                                    in
-                                        
                                     case record.mainContent of
                                         [ Ok (Json json) ] ->
                                             json
@@ -158,8 +247,8 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
             Nothing
 
 
-processSection : (String -> Result (Error e) (List JsonValue)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> List (Result (Error e) (Content a))
-processSection valueListForIdentifier evaluateExpression sectionWrapper =
+processSection : (String -> Result (Error e) (List JsonValue)) -> (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> Section a -> List (Result (Error e) (Content a))
+processSection valueListForIdentifier evaluateComponent evaluateExpression sectionWrapper =
     let
         section =
             case sectionWrapper of
@@ -183,7 +272,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
         processContent content =
             case content of
                 Text text ->
-                    Ok (Text (mustache resolveExpressionString text))
+                    Ok (Text (mustache evaluateComponent resolveExpressionString text))
 
                 List contentItems ->
                     -- Ok (List contentItems)
@@ -224,7 +313,7 @@ processSection valueListForIdentifier evaluateExpression sectionWrapper =
                             |> Result.mapError DecodingJson
 
                 Code language codeText ->
-                    Ok (Code language (mustache resolveExpressionString codeText))
+                    Ok (Code language (mustache evaluateComponent resolveExpressionString codeText))
 
                 Expressions input ->
                     case evaluateExpression valueForIdentifier input of
@@ -263,8 +352,8 @@ flattenResults inItems =
             Ok []
 
 
-nextProcessedSection : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List (Result (Error e) (Content a))
-nextProcessedSection evaluateExpression contentToJson section prevResults =
+nextProcessedSection : (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List (Result (Error e) (Content a))
+nextProcessedSection evaluateComponent evaluateExpression contentToJson section prevResults =
     let
         contentForKey : String -> Result (Error e) (List (Content a))
         contentForKey key =
@@ -279,11 +368,11 @@ nextProcessedSection evaluateExpression contentToJson section prevResults =
             contentForKey key
                 |> Result.andThen (List.map (contentToJson >> Result.mapError (always CannotConvertContent)) >> flattenResults)
     in
-        processSection valueForIdentifier evaluateExpression section
+        processSection valueForIdentifier evaluateComponent evaluateExpression section
 
 
-foldProcessedSections : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List ( String, ResolvedSection (Error e) a )
-foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResults =
+foldProcessedSections : (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List ( String, ResolvedSection (Error e) a )
+foldProcessedSections evaluateComponent evaluateExpression contentToJson sectionWrapper prevResults =
     let
         title =
             case sectionWrapper of
@@ -297,11 +386,11 @@ foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResult
 
         resolvedMainContent : List (Result (Error e) (Content a))
         resolvedMainContent =
-            nextProcessedSection evaluateExpression contentToJson sectionWrapper prevResults
+            nextProcessedSection evaluateComponent evaluateExpression contentToJson sectionWrapper prevResults
 
         resolvedSubsections =
             subsections
-                |> List.foldl (foldProcessedSections evaluateExpression contentToJson) prevResults
+                |> List.foldl (foldProcessedSections evaluateComponent evaluateExpression contentToJson) prevResults
                 |> List.take (List.length subsections)
 
         resolvedSection =
@@ -313,15 +402,15 @@ foldProcessedSections evaluateExpression contentToJson sectionWrapper prevResult
         ( title, resolvedSection ) :: prevResults
 
 
-{-| Process a document and return a result
+{-| Process a document with the inputted content and return a result
 -}
-processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Resolved e a
-processDocument evaluateExpression contentToJson document =
+processDocumentWith : (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Dict String JsonValue -> Resolved e a
+processDocumentWith evaluateComponent evaluateExpression contentToJson document inputtedContent =
     let
         resolvedSections : List ( String, ResolvedSection (Error e) a )
         resolvedSections =
             document.sections
-                |> List.foldl (foldProcessedSections evaluateExpression contentToJson) []
+                |> List.foldl (foldProcessedSections evaluateComponent evaluateExpression contentToJson) []
                 |> List.reverse
 
         resolvedIntro =
@@ -335,10 +424,89 @@ processDocument evaluateExpression contentToJson document =
                         , urls = []
                         }
             in
-                nextProcessedSection evaluateExpression contentToJson introSection resolvedSections
+                nextProcessedSection evaluateComponent evaluateExpression contentToJson introSection resolvedSections
                     |> List.reverse
     in
         { sections = resolvedSections
         , intro = resolvedIntro
         , tests = []
         }
+
+
+defaultEvaluateComponent : CustomElement -> Result (Error e) (Content a)
+defaultEvaluateComponent element =
+    case element.componentName of
+        "Button" ->
+            let
+                propsDict =
+                    element.props
+                        |> Dict.fromList
+                
+                primary : Bool
+                primary =
+                    case Dict.get "primary" propsDict of
+                        Just (JsonValue.BoolValue bool) ->
+                            bool
+                        
+                        _ ->
+                            False
+                
+                content : String
+                content =
+                    case Dict.get "children" propsDict of
+                        Just (JsonValue.StringValue string) ->
+                            string
+                        
+                        _ ->
+                            ""
+                
+                class : String
+                class =
+                    [ "px-2 py-2 rounded"
+                    , if primary then "bg-blue-light" else "bg-grey-light"
+                    ] |> String.join " "
+            in
+                
+            Ok <| Code (Just "html") <| "<button class=\"" ++ class ++ "\">" ++ content ++ "</button>"
+
+        "orange-button" ->
+            Ok <| Code (Just "html") """<button class="bg-orange-light px-2 py-1 rounded">Click me</button>
+"""
+
+        _ ->
+            Err <| NoValueForIdentifier element.componentName
+
+
+{-| Process a document and return a result
+-}
+processDocument : ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Resolved e a
+processDocument evaluateExpression contentToJson document =
+    processDocumentWith defaultEvaluateComponent evaluateExpression contentToJson document Dict.empty
+
+
+findSectionContent : String -> Resolved e a -> Maybe (List (Result (Error e) (Content a)))
+findSectionContent sectionTitle resolvedDocument =
+    let
+        hasTitle (title, _) =
+            title == sectionTitle
+        
+        maybeSection =
+            resolvedDocument.sections
+                |> List.filter hasTitle
+                |> List.head
+                |> Maybe.map (Tuple.second)
+    in
+        case maybeSection of
+            Just (ResolvedSection record) ->
+                Just record.mainContent
+            
+            _ ->
+                Nothing
+
+
+{-| Process a document with inputted content and return a result
+-}
+processComponent : String -> (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Document a -> Dict String JsonValue -> Maybe (List (Result (Error e) (Content a)))
+processComponent sectionTitle evaluateComponent evaluateExpression contentToJson document inputtedContent =
+    processDocumentWith evaluateComponent evaluateExpression contentToJson document inputtedContent
+        |> findSectionContent sectionTitle 
