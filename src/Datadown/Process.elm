@@ -73,7 +73,7 @@ mustacheVariableRegex =
 
 customElementOpenRegex : Regex
 customElementOpenRegex =
-    Regex.regex "<([A-Z]\\w*)([^>]*)>(.+)"
+    Regex.regex "<([A-Z]\\w*)([^>]*)>([\\S\\s]+)"
 
 
 attributeRegex : Regex
@@ -147,11 +147,30 @@ processCustomElements evaluateComponent input =
                             case maybeContent of
                                 Just content ->
                                     case Regex.split (Regex.AtMost 1) (customElementCloseRegex componentName) content of
-                                        childrenSource :: rest :: [] ->
-                                            (CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue childrenSource)]), rest)
+                                        childrenSource :: restInput :: [] ->
+                                            let
+                                                children =
+                                                    processCustomElements evaluateComponent childrenSource
+
+                                                el =
+                                                    CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue children)])
+
+                                                rest =
+                                                    restInput
+                                                        |> Debug.log ("rest input | " ++ content)
+                                                        |> processCustomElements evaluateComponent
+                                            in
+                                                (el, rest)
                                         
                                         childrenSource :: [] ->
-                                            (CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue childrenSource)]), "")
+                                            let
+                                                children =
+                                                    processCustomElements evaluateComponent childrenSource
+                                                
+                                                el =
+                                                    CustomElement Nothing componentName (props ++ [("children", JsonValue.StringValue children)])
+                                            in
+                                                (el, "")
                                         
                                         _ ->
                                             (CustomElement Nothing componentName props, "")
@@ -164,10 +183,10 @@ processCustomElements evaluateComponent input =
                     in
                         case result of
                             Ok (Code maybeLanguage source) ->
-                                source
+                                source ++ rest
                             
                             Ok _ ->
-                                ""
+                                rest
                             
                             Err error ->
                                 (toString error)
@@ -435,30 +454,46 @@ processDocumentWith evaluateComponent evaluateExpression contentToJson document 
 
 defaultEvaluateComponent : CustomElement -> Result (Error e) (Content a)
 defaultEvaluateComponent element =
+    let
+        propsDict =
+            element.props
+                |> Dict.fromList
+        
+        getBoolProp name =
+            case Dict.get name propsDict of
+                Just (JsonValue.BoolValue bool) ->
+                    bool
+                
+                _ ->
+                    False
+        
+        getStringProp name =
+            case Dict.get name propsDict of
+                Just (JsonValue.StringValue string) ->
+                    string
+                
+                _ ->
+                    ""
+    in
+        
     case element.componentName of
-        "Button" ->
+        "Row" ->
             let
-                propsDict =
-                    element.props
-                        |> Dict.fromList
+                content = getStringProp "children"
+            in
+                Ok <| Code (Just "html") <| "<div class=\"flex flex-row\">" ++ content ++ "</div>"
+        
+        "Col" ->
+            let
+                content = getStringProp "children"
+            in
+                Ok <| Code (Just "html") <| "<div class=\"flex flex-col flex-grow\">" ++ content ++ "</div>"
+        
+        "Button" ->
+            let 
+                primary = getBoolProp "primary"
                 
-                primary : Bool
-                primary =
-                    case Dict.get "primary" propsDict of
-                        Just (JsonValue.BoolValue bool) ->
-                            bool
-                        
-                        _ ->
-                            False
-                
-                content : String
-                content =
-                    case Dict.get "children" propsDict of
-                        Just (JsonValue.StringValue string) ->
-                            string
-                        
-                        _ ->
-                            ""
+                content = getStringProp "children"
                 
                 class : String
                 class =
