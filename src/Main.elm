@@ -441,7 +441,7 @@ viewCode options maybeLanguage source =
             div []
                 [ div [] [ previewHtml ]
                 , details [ class "mt-2" ]
-                    [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
+                    [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest cursor-default" ]
                         [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
                         [ code [ class "font-mono text-xs" ] [ text source ] ]
