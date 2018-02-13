@@ -15,6 +15,7 @@ import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview
 import Preview.Json
+import Preview.Decorate
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
@@ -454,7 +455,7 @@ viewContent : DisplayOptions -> Content (Result Error (List (List Token))) -> Ht
 viewContent options content =
     case content of
         Text s ->
-            div [ class "font-sans w-full" ] [ text s ]
+            div [ class "font-sans w-full" ] (Preview.Decorate.view s)
 
         Code language source ->
             viewCode options language source

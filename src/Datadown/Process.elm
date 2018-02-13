@@ -157,7 +157,6 @@ processCustomElements evaluateComponent input =
 
                                                 rest =
                                                     restInput
-                                                        |> Debug.log ("rest input | " ++ content)
                                                         |> processCustomElements evaluateComponent
                                             in
                                                 (el, rest)

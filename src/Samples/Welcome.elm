@@ -7,7 +7,17 @@ source =
 
 ## what
 
-Make interactive elements using Markdown. Prototype HTML and SVG, and export as React components.
+Prototype interactive HTML & SVG using Markdown.
+
+## colors
+### blue
+`#5bf`
+### blue_darker
+`#14f`
+### pink
+`#d6b`
+### pink_darker
+`#a29`
 
 ## why
 
@@ -16,7 +26,7 @@ Edit live. No installation or config. Mobile friendly.
 ## what.svg
 ```svg
 <svg width="100%">
-<text x="10" y="50" font-size="1.8rem" fill="#5bf" stroke="#14f" stroke-dasharray="6 2">
+<text x="10" y="50" font-size="1.8rem" fill="{{ colors.blue }}" stroke="{{ colors.blue_darker }}" stroke-dasharray="6 2">
 {{ what }}
 </text>
 </svg>
@@ -25,7 +35,7 @@ Edit live. No installation or config. Mobile friendly.
 ## why.svg
 ```svg
 <svg width="100%">
-<text x="10" y="50" font-size="1.8rem" fill="#d6b" stroke="#a29" stroke-dasharray="6 2">
+<text x="10" y="50" font-size="1.8rem" fill="{{ colors.pink }}" stroke="{{ colors.pink_darker }}" stroke-dasharray="6 2">
 {{ why }}
 </text>
 </svg>
