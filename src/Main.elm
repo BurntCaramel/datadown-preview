@@ -432,17 +432,17 @@ showCodeForLanguage language =
             True
 
 viewCode : DisplayOptions -> Maybe String -> String -> Html Message
-viewCode options language source =
+viewCode options maybeLanguage source =
     let
         previewHtml =
-            Preview.view language source
+            Preview.view maybeLanguage source
     in
-        if not options.compact && showCodeForLanguage language then
+        if not options.compact && showCodeForLanguage maybeLanguage then
             div []
                 [ div [] [ previewHtml ]
                 , details [ class "mt-2" ]
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker bg-purple-lightest" ]
-                        [ text "Source" ]
+                        [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
                         [ code [ class "font-mono text-xs" ] [ text source ] ]
                     ]
