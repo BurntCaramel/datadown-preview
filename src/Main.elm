@@ -20,6 +20,7 @@ import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
 import Samples.Clock
+import Samples.Images
 
 
 type EditMode
@@ -222,6 +223,7 @@ init flags =
     { documentSources =
         [ Samples.Welcome.source
         , Samples.Clock.source
+        , Samples.Images.source
         , "# Now your turn!"
         ]
             |> Array.fromList

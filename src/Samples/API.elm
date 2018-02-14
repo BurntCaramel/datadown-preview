@@ -12,5 +12,4 @@ source =
 ```html
 <p>{{ post.title }}</p>
 ```
-```
 """
