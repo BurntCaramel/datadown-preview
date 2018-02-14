@@ -155,9 +155,9 @@ token =
         oneOf
             [ succeed Value
                 |= magicNumbers
+            , identifier
             , succeed Value
                 |= value
-            , identifier
             , succeed Operator
                 |= operator
             ]
