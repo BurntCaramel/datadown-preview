@@ -17,9 +17,9 @@ purple
 - inline-block px-3 py-2
 - text-white
 - bg-{{ color }} hover:bg-{{ color }}-dark border-{{ color }}
-- rounded
+- rounded shadow
 
-## render
+## view
 ```html
 <button class="{{ classes }}">
   {{ content }}
