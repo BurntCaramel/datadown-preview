@@ -21,7 +21,7 @@ import Markdown.Inline as Inline exposing (Inline(..))
 
 mustacheExpressionRegex : Regex
 mustacheExpressionRegex =
-    Regex.regex "{{([^}]*)}}"
+    Regex.regex "{{[#/^]?([^}]*)}}"
 
 
 listMustacheExpressions : String -> List String

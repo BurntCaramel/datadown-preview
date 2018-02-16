@@ -72,6 +72,16 @@ mustacheVariableRegex =
     Regex.regex "{{([^}]*)}}"
 
 
+mustacheSectionRegex : Regex
+mustacheSectionRegex =
+    Regex.regex "{{#\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+
+
+mustacheSectionNegativeRegex : Regex
+mustacheSectionNegativeRegex =
+    Regex.regex "{{^\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+
+
 customElementOpenRegex : Regex
 customElementOpenRegex =
     Regex.regex "<([A-Z]\\w*)([^>]*)>([\\S\\s]+)"
@@ -202,8 +212,52 @@ processCustomElements evaluateComponent input =
 mustache : (CustomElement -> Result (Error e) (Content a)) -> (String -> Maybe JsonValue) -> String -> String
 mustache evaluateComponent resolveVariable input =
     let
-        replacer : Regex.Match -> String
-        replacer match =
+        sectionReplacer : (Bool -> Bool) -> Regex.Match -> String
+        sectionReplacer transformBool match =
+            let
+                value : Maybe JsonValue
+                value =
+                    match.submatches
+                        |> List.head
+                        |> Maybe.withDefault Nothing
+                        |> Maybe.andThen resolveVariable
+
+                inner : String
+                inner =
+                    case match.submatches of
+                        _ :: Just string :: [] ->
+                            string
+                        
+                        _ ->
+                            ""
+
+                truthy =
+                    case value of
+                        Nothing ->
+                            False
+                        
+                        Just (JsonValue.BoolValue False) ->
+                            False
+                        
+                        Just JsonValue.NullValue ->
+                            False
+                        
+                        Just (JsonValue.ArrayValue [JsonValue.BoolValue False]) ->
+                            False
+                        
+                        Just (JsonValue.ArrayValue [JsonValue.NullValue]) ->
+                            False
+                        
+                        _ ->
+                            True
+                
+                open =
+                    transformBool truthy
+            in
+                if open then inner else ""
+
+        variableReplacer : Regex.Match -> String
+        variableReplacer match =
             match.submatches
                 |> List.head
                 |> Maybe.withDefault Nothing
@@ -214,7 +268,9 @@ mustache evaluateComponent resolveVariable input =
     in
         input
             |> processCustomElements evaluateComponent
-            |> Regex.replace Regex.All mustacheVariableRegex replacer
+            |> Regex.replace Regex.All mustacheSectionRegex (sectionReplacer identity)
+            |> Regex.replace Regex.All mustacheSectionNegativeRegex (sectionReplacer not)
+            |> Regex.replace Regex.All mustacheVariableRegex variableReplacer
 
 
 contentForKeyPathInResolvedSections : List ( String, ResolvedSection (Error e) a ) -> List String -> Maybe (List (Result (Error e) (Content a)))

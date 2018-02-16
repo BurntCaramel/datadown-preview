@@ -15,11 +15,9 @@ HTTP.get_json post_url
 
 ## view
 ```html
-<p>{{ post.result.title }}</p>
-```
-
-## future
-```html
+{{#post.error}}
+<p>Error: {{ post.error.message }}</p>
+{{/post.error}}
 {{#post.result}}
 <p>{{ post.result.title }}</p>
 {{/post.result}}
