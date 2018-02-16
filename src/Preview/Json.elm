@@ -66,7 +66,8 @@ viewValue json =
 
                 ArrayValue items ->
                     [ details [ attribute "open" "" ]
-                        [ summary [] [ viewSymbol "[" ]
+                        [ summary [ class "cursor-pointer" ]
+                            [ span [ class "text-purple-light summary-indicator-inline" ] [], viewSymbol "[" ]
                         , ol [ class "text-base roman" ] (List.map viewArrayItem items)
                         , viewSymbol "]"
                         ]
@@ -74,7 +75,8 @@ viewValue json =
 
                 ObjectValue items ->
                     [ details [ attribute "open" "" ]
-                        [ summary [] [ viewSymbol "{" ]
+                        [ summary [ class "cursor-pointer summary-indicator-inline" ]
+                            [ span [ class "text-purple-light summary-indicator-inline" ] [], viewSymbol "{" ]
                         , dl [ class "ml-2 text-base roman" ] (List.concatMap viewKeyValuePair items)
                         , viewSymbol "}"
                         ]

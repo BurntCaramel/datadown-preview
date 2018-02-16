@@ -36,7 +36,7 @@ process input =
     case String.split "__END__" input of
         [] ->
             [ text "!!!" ]
-        
+
         head :: tail ->
             let
                 rest =
@@ -47,7 +47,7 @@ process input =
                         color =
                             String.dropLeft 7 head
                     in
-                        [ span [ class "inline-block w-4 h-4 mr-1 border border-grey-dark", style [("backgroundColor", color)] ] []
+                        [ span [ class "inline-block w-4 h-4 mr-1 border border-grey-dark", style [ ( "backgroundColor", color ) ] ] []
                         , text color
                         , rest
                         ]

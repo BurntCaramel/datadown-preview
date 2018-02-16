@@ -9,6 +9,7 @@ module Expressions.Tokenize
         , Token(..)
         , Operator(..)
         , MathFunction(..)
+        , HttpFunction(..)
         )
 
 {-| Tokenize
@@ -39,6 +40,10 @@ type MathFunction
     | Turns
 
 
+type HttpFunction
+    = GetJson
+
+
 type Operator
     = Add
     | Subtract
@@ -49,6 +54,7 @@ type Operator
     | LessThan Bool
     | GreaterThan Bool
     | Math MathFunction
+    | Http HttpFunction
 
 
 type Token
@@ -120,6 +126,8 @@ operator =
             |. keyword "Math.tan"
         , succeed (Math Turns)
             |. keyword "Math.turns"
+        , succeed (Http GetJson)
+            |. keyword "HTTP.get_json"
         ]
 
 

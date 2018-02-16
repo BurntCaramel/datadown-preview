@@ -3,7 +3,6 @@ module Preview
         ( view
         )
 
-
 {-| Preview code snippets
 
 
@@ -22,13 +21,13 @@ import Preview.Markdown
 
 languageToViewTable : Dict String (String -> Html msg)
 languageToViewTable =
-  Dict.fromList
-    [ ("html", Preview.Html.view False)
-    , ("svg", Preview.Html.view True)
-    , ("json", Preview.Json.view)
-    , ("markdown", Preview.Markdown.view)
-    , ("md", Preview.Markdown.view)
-    ]
+    Dict.fromList
+        [ ( "html", Preview.Html.view False )
+        , ( "svg", Preview.Html.view True )
+        , ( "json", Preview.Json.view )
+        , ( "markdown", Preview.Markdown.view )
+        , ( "md", Preview.Markdown.view )
+        ]
 
 
 languageToView : String -> Maybe (String -> Html msg)
@@ -53,6 +52,6 @@ view maybeLanguage source =
         case maybeView of
             Just view ->
                 view source
-            
+
             Nothing ->
                 defaultView maybeLanguage source

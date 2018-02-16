@@ -57,12 +57,12 @@ processContentBlock parseExpressions block =
 
                 _ ->
                     Nothing
-        
+
         urlFromInline inline =
             case inline of
                 Link url maybeTitle innerInlines ->
-                    [url] |> Debug.log "Found url"
-                
+                    [ url ] |> Debug.log "Found url"
+
                 _ ->
                     []
 
@@ -213,7 +213,7 @@ processDocumentBlock parseExpressions block document =
                 expressions =
                     contentAndExpressions
                         |> List.concatMap .expressionPairs
-                
+
                 urls =
                     contentAndExpressions
                         |> List.concatMap .urls

@@ -8,7 +8,7 @@ module Datadown
 {-| A library for Datadown parsing
 
 
-# Types
+## Types
 
 @docs Document, Section, Content
 
@@ -27,6 +27,7 @@ type Content a
     | List (List (Content a)) -- -
     | Quote (Document a) -- >
     | Json JsonValue
+    | Reference String (List String)
 
 
 {-| A section of data

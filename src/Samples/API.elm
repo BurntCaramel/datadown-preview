@@ -3,13 +3,25 @@ module Samples.API exposing (source)
 
 source : String
 source =
-    """# Welcome to Datadown
+    """# Loading from APIs
+
+## post_url
+<https://jsonplaceholder.typicode.com/posts/3>
 
 ## post
-<https://jsonplaceholder.typicode.com/posts/3>
+```
+HTTP.get_json post_url
+```
 
 ## view
 ```html
-<p>{{ post.title }}</p>
+<p>{{ post.result.title }}</p>
+```
+
+## future
+```html
+{{#post.result}}
+<p>{{ post.result.title }}</p>
+{{/post.result}}
 ```
 """

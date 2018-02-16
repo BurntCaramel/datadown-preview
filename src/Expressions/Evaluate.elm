@@ -4,8 +4,9 @@ module Expressions.Evaluate
         , Error(..)
         )
 
-import Expressions.Tokenize exposing (Operator(..), Token(..), MathFunction(..))
+import Expressions.Tokenize exposing (Operator(..), Token(..), MathFunction(..), HttpFunction(..))
 import JsonValue exposing (JsonValue(..))
+import Datadown.Rpc
 
 
 type Error
@@ -17,6 +18,7 @@ type Error
     | Unknown
     | InvalidValuesForOperator Operator JsonValue JsonValue
     | CannotConvertToJson
+    | Rpc Datadown.Rpc.Error
 
 
 identityForOperator : Operator -> Maybe JsonValue
@@ -48,6 +50,33 @@ toFloat value =
 
         _ ->
             Nothing
+
+
+useString : JsonValue -> Maybe String
+useString value =
+    case value of
+        NumericValue f ->
+            Just <| toString f
+
+        StringValue s ->
+            Just s
+
+        ArrayValue (item :: []) ->
+            useString item
+
+        _ ->
+            Nothing
+
+
+makeRpcJson : String -> Maybe JsonValue -> JsonValue -> JsonValue
+makeRpcJson method maybeParams id =
+    [ Just ( "jsonrpc", StringValue "2.0" )
+    , Just ( "method", StringValue method )
+    , Maybe.map ((,) "params") maybeParams
+    , Just ( "id", id )
+    ]
+        |> List.filterMap identity
+        |> ObjectValue
 
 
 processOperator : Operator -> JsonValue -> JsonValue -> Result Error JsonValue
@@ -142,6 +171,24 @@ processOperator op a b =
 
                 _ ->
                     Err <| InvalidValuesForOperator op a b
+
+        Http function ->
+            case function of
+                GetJson ->
+                    case useString b of
+                        Just url ->
+                            Ok <|
+                                makeRpcJson "HTTP"
+                                    (Just <|
+                                        ObjectValue
+                                            [ ( "method", StringValue "GET" )
+                                            , ( "url", StringValue url )
+                                            ]
+                                    )
+                                    (StringValue <| "GET json " ++ url)
+
+                        _ ->
+                            Err <| InvalidValuesForOperator op a b
 
 
 valueOperatorOnList : Operator -> JsonValue -> List JsonValue -> Result Error JsonValue

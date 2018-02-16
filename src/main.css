@@ -19,8 +19,29 @@ summary::-webkit-details-marker {
   display: none;
 }
 /* Section titles when collapsed */
-details:not([open]) > summary > h2:after {
-  content: '…'
+details > summary .summary-indicator-absolute {
+  position: relative;
+}
+details[open] > summary .summary-indicator-absolute:before {
+  content: '−';
+  position: absolute;
+  left: -1rem;
+  opacity: 0.1;
+}
+details:not([open]) > summary .summary-indicator-absolute:before {
+  content: '+';
+  position: absolute;
+  left: -1rem;
+}
+/* RPC summary when collapsed */
+details > summary .summary-indicator-inline {
+  white-space: nowrap;
+}
+details[open] > summary .summary-indicator-inline:before {
+  content: '− ';
+}
+details:not([open]) > summary .summary-indicator-inline:before {
+  content: '+ ';
 }
 
 .bg-purple-o-10 {

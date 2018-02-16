@@ -11,6 +11,7 @@ import Http
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
+import Datadown.Rpc exposing (Rpc)
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview
@@ -21,6 +22,7 @@ import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
 import Samples.Clock
 import Samples.Images
+import Samples.API
 
 
 type EditMode
@@ -34,13 +36,13 @@ editModeFromInt int =
     case int of
         0 ->
             Just Off
-        
+
         1 ->
             Just WithPreview
-        
+
         2 ->
             Just Only
-        
+
         _ ->
             Nothing
 
@@ -51,6 +53,7 @@ type alias Model =
     , editMode : EditMode
     , now : Time
     , sectionInputs : Dict String JsonValue
+    , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
     , loadedJson : Dict String (Maybe (Result Http.Error JsonValue))
     }
 
@@ -71,6 +74,7 @@ type alias DisplayOptions =
     , hideNoContent : Bool
     , processDocument : Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
     , sectionInputs : Dict String JsonValue
+    , getRpcResponse : Datadown.Rpc.Id -> Maybe (Maybe Datadown.Rpc.Response)
     }
 
 
@@ -130,31 +134,12 @@ valueFromModel model key =
             key
                 |> String.split "."
     in
-        
-    case Dict.get key model.sectionInputs of
-        Just value ->
-            Just value
+        case Dict.get key model.sectionInputs of
+            Just value ->
+                Just value
 
-        Nothing ->
-            case keyPath of
-                [] ->
-                    Nothing
-                
-                firstKey :: otherKeys ->
-                    case Dict.get firstKey model.loadedJson of
-                        -- Has not begun loading
-                        Nothing ->
-                            builtInValueFromModel model key
-                        
-                        -- Has begun loading
-                        Just Nothing ->
-                            Just NullValue
-                        
-                        Just (Just result) ->
-                            result
-                                |> Result.mapError Process.Http
-                                |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Process.DecodingJson)
-                                |> Result.toMaybe
+            Nothing ->
+                builtInValueFromModel model key
 
 
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
@@ -164,16 +149,37 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
         resolveWithModel key =
             case resolveFromDocument key of
                 Ok value ->
-                    Ok value
+                    case value of
+                    --     JsonValue.ArrayValue [ item ] ->
+                    --         case Datadown.Rpc.fromJsonValue item of
+                    --             Just rpc ->
+                    --                 let
+                    --                     maybeMaybeResponse =
+                    --                         Dict.get rpc.id model.rpcResponses
+                    --                 in
+                    --                     case maybeMaybeResponse of
+                    --                         Nothing ->
+                    --                             Ok (JsonValue.StringValue "Needs loading")
+
+                    --                         Just Nothing ->
+                    --                             Ok (JsonValue.StringValue "Loading…")
+
+                    --                         Just (Just response) ->
+                    --                             Ok (JsonValue.StringValue (toString response.result))
+
+                    --             Nothing ->
+                    --                 Ok value
+
+                        _ ->
+                            Ok value
 
                 Err error ->
                     case valueFromModel model key of
                         Just value ->
                             Ok value
-                        
+
                         Nothing ->
                             Err error
-                        
     in
         case parsedExpressions of
             Err error ->
@@ -181,6 +187,40 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
 
             Ok expressions ->
                 evaluateTokenLines resolveWithModel expressions
+
+
+valueForRpcID : Model -> String -> List String -> Result Evaluate.Error JsonValue
+valueForRpcID model id keyPath =
+    let
+        maybeMaybeResponse =
+            Dict.get id model.rpcResponses
+    in
+        case maybeMaybeResponse of
+            Nothing ->
+                Ok (JsonValue.NullValue)
+
+            Just Nothing ->
+                Ok (JsonValue.StringValue "Loading…")
+
+            Just (Just response) ->
+                case keyPath of
+                    "result" :: otherKeys ->
+                        response.result
+                            |> Result.mapError Evaluate.Rpc
+                            |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
+                    
+                    "error" :: otherKeys ->
+                        case response.result of
+                            Err error ->
+                                error
+                                    |> Datadown.Rpc.errorToJsonValue
+                                    |> JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier
+                            
+                            _ ->
+                                Ok (JsonValue.NullValue)
+                    
+                    _ ->
+                        Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
 
 
 contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
@@ -208,14 +248,17 @@ contentToJson model content =
 
         Code maybeLanguage source ->
             Ok <| JsonValue.StringValue <| String.trim source
+        
+        Reference id keyPath ->
+            valueForRpcID model id keyPath
 
         _ ->
             Err Evaluate.CannotConvertToJson
 
 
 type alias Flags =
-  { editModeInt : Maybe Int
-  }
+    { editModeInt : Maybe Int
+    }
 
 
 init : Flags -> ( Model, Cmd Message )
@@ -224,15 +267,18 @@ init flags =
         [ Samples.Welcome.source
         , Samples.Clock.source
         , Samples.Images.source
+        , Samples.API.source
         , "# Now your turn!"
         ]
             |> Array.fromList
     , nav = Document 0
-    , editMode = flags.editModeInt
-        |> Maybe.andThen editModeFromInt
-        |> Maybe.withDefault WithPreview
+    , editMode =
+        flags.editModeInt
+            |> Maybe.andThen editModeFromInt
+            |> Maybe.withDefault WithPreview
     , now = 0
     , sectionInputs = Dict.empty
+    , rpcResponses = Dict.empty
     , loadedJson = Dict.empty
     }
         ! [ Cmd.none
@@ -250,6 +296,7 @@ type Message
     | Time Time
     | BeginLoading
     | JsonLoaded String (Result Http.Error JsonValue)
+    | RpcResponded Datadown.Rpc.Response
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -342,43 +389,46 @@ update msg model =
 
         BeginLoading ->
             let
-                maybeDocument : Maybe (Document (Result Error (List (List Token))))
                 maybeDocument =
                     case model.nav of
                         Document index ->
                             Array.get index model.documentSources
                                 |> Maybe.map (parseDocument parseExpressions)
+
                         _ ->
                             Nothing
-                
-                urlsFromSection section =
+
+                maybeResolvedDocument =
+                    maybeDocument
+                        |> Maybe.map (processDocumentWithModel model)
+
+                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) (Result Error (List (List Token))) ) -> List Rpc
+                rpcsFromSection ( title, section ) =
                     case section of
-                        Section { title, urls } ->
-                            case urls of
-                                [url] ->
-                                    Just (title, url)
-                                
-                                _ ->
-                                    Nothing
-                
-                urls =
-                    case maybeDocument of
-                        Just document ->
-                            document.sections
-                                |> List.filterMap urlsFromSection
-                        
+                        ResolvedSection { rpcs } ->
+                            rpcs
+
+                rpcs =
+                    case maybeResolvedDocument of
+                        Just resolved ->
+                            resolved.sections
+                                |> List.concatMap rpcsFromSection
+
                         Nothing ->
                             []
-                
-                loadJson (sectionTitle, url) =
-                    Http.get url JsonValue.decoder
-                        |> Http.send (JsonLoaded sectionTitle)
-                
+
                 commands =
-                    urls
-                        |> List.map loadJson
+                    rpcs
+                        |> List.filterMap (Datadown.Rpc.toCommand RpcResponded)
             in
                 ( model, Cmd.batch commands )
+
+        RpcResponded response ->
+            let
+                rpcResponses =
+                    Dict.insert response.id (Just response) model.rpcResponses
+            in
+                ( { model | rpcResponses = rpcResponses }, Cmd.none )
 
         JsonLoaded key json ->
             let
@@ -433,6 +483,7 @@ showCodeForLanguage language =
         _ ->
             True
 
+
 viewCode : DisplayOptions -> Maybe String -> String -> Html Message
 viewCode options maybeLanguage source =
     let
@@ -453,6 +504,57 @@ viewCode options maybeLanguage source =
             div [] [ previewHtml ]
 
 
+viewRpc : Rpc -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
+viewRpc rpc maybeResponse =
+    let
+        (loadingClasses, responseStatusHtml, maybeResponseHtml) =
+            case maybeResponse of
+                Nothing ->
+                    ("bg-grey-lighter", text "Not loaded", Nothing)
+                
+                Just Nothing ->
+                    ("bg-orange-lighter", text "Loading…", Nothing)
+                
+                Just (Just response) ->
+                    case response.result of
+                        Ok json ->
+                            ("bg-green-lighter", span [] [ text "Success" ], Just <| Preview.Json.viewJson json)
+                        
+                        Err error ->
+                            let
+                                statusText =
+                                    [ "Error:"
+                                    , toString error.code
+                                    , error.message
+                                    ]
+                                        |> String.join " "
+                            in
+                                ("bg-red-lighter", span [] [ text statusText ], Maybe.map Preview.Json.viewJson error.data)
+    in
+        div []
+            [ details []
+                [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic text-white bg-grey-darker cursor-pointer" ]
+                    [ span [ class "pr-2 summary-indicator-inline" ] [ text rpc.method]
+                    , span [] [ text rpc.id ]
+                    ]
+                , rpc.params
+                    |> Maybe.map Preview.Json.viewJson
+                    |> Maybe.withDefault (text "")
+                ]
+            , case maybeResponseHtml of
+                    Just responseHtml ->
+                        details []
+                            [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer summary-indicator-inline", class loadingClasses ]
+                                [ responseStatusHtml ]
+                            , responseHtml
+                            ]
+
+                    Nothing ->
+                        div [ class "px-2 py-1 font-mono text-xs italic", class loadingClasses ]
+                            [ responseStatusHtml ]
+            ]
+
+
 viewContent : DisplayOptions -> Content (Result Error (List (List Token))) -> Html Message
 viewContent options content =
     case content of
@@ -463,7 +565,16 @@ viewContent options content =
             viewCode options language source
 
         Json json ->
-            Preview.Json.viewJson json
+            let
+                maybeRpc =
+                    Datadown.Rpc.fromJsonValue json
+            in
+                case maybeRpc of
+                    Just rpc ->
+                        viewRpc rpc (options.getRpcResponse rpc.id)
+
+                    Nothing ->
+                        Preview.Json.viewJson json
 
         Expressions expressionsResult ->
             case expressionsResult of
@@ -486,6 +597,9 @@ viewContent options content =
                     |> List.map makeSectionViewModel
                     |> List.map (viewSection [] options)
                     |> div [ class "pl-6 border-l border-teal" ]
+        
+        Reference id keyPath ->
+            div [] [ text "Reference: ", text <| toString id]
 
 
 viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
@@ -530,7 +644,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
 
                             json ->
                                 toString json
-                    
+
                     hasSubsections =
                         not <| List.isEmpty subsections
                 in
@@ -563,16 +677,16 @@ viewSectionTitle : Int -> List (Html.Html msg) -> Html.Html msg
 viewSectionTitle level =
     case level of
         0 ->
-            h2 [ class "mb-2 text-xl text-blue-dark" ]
+            h2 [ class "mb-2 text-xl text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
         1 ->
-            h3 [ class "mb-2 text-lg text-blue-dark" ]
+            h3 [ class "mb-2 text-lg text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
         2 ->
-            h4 [ class "mb-2 text-base text-blue-dark" ]
+            h4 [ class "mb-2 text-base text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
         _ ->
-            h4 [ class "mb-2 text-sm text-blue-dark" ]
+            h4 [ class "mb-2 text-sm text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
 
 viewSection : List String -> DisplayOptions -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
@@ -664,6 +778,11 @@ viewDocuments model =
             ]
 
 
+processDocumentWithModel : Model -> Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
+processDocumentWithModel model document =
+    processDocument (evaluateExpressions model) (contentToJson model) document
+
+
 viewDocumentPreview : Model -> String -> Html Message
 viewDocumentPreview model documentSource =
     let
@@ -671,18 +790,17 @@ viewDocumentPreview model documentSource =
         document =
             parseDocument parseExpressions documentSource
 
-        processDocument_ =
-            processDocument (evaluateExpressions model) (contentToJson model)
-
         resolved : Resolved Evaluate.Error (Result Error (List (List Token)))
         resolved =
-            processDocument_ document
+            processDocumentWithModel model document
 
+        displayOptions : DisplayOptions
         displayOptions =
             { compact = False
             , hideNoContent = False
-            , processDocument = processDocument_
+            , processDocument = processDocumentWithModel model
             , sectionInputs = model.sectionInputs
+            , getRpcResponse = (flip Dict.get) model.rpcResponses
             }
 
         sectionsHtml : List (Html Message)
@@ -695,10 +813,9 @@ viewDocumentPreview model documentSource =
         introHtml =
             resolved.intro
                 |> viewContentResults
-                    { compact = True
-                    , hideNoContent = True
-                    , processDocument = processDocument_
-                    , sectionInputs = model.sectionInputs
+                    { displayOptions
+                        | compact = True
+                        , hideNoContent = True
                     }
                     []
                     "intro"
@@ -720,17 +837,17 @@ viewDocumentSource model documentSource =
             case model.editMode of
                 Off ->
                     text ""
-                
+
                 _ ->
                     div [ class "flex-1 min-w-full md:min-w-0" ]
                         [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
                         ]
-        
+
         previewHtml =
             case model.editMode of
                 Only ->
                     text ""
-                
+
                 _ ->
                     viewDocumentPreview model documentSource
     in
