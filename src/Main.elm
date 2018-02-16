@@ -47,8 +47,14 @@ editModeFromInt int =
             Nothing
 
 
+type alias Expressions =
+    Result Error (List (List Token))
+
+
 type alias Model =
     { documentSources : Array String
+    , parsedDocuments : Dict Int (Document Expressions)
+    , processedDocuments : Dict Int (Resolved Evaluate.Error Expressions)
     , nav : Nav
     , editMode : EditMode
     , now : Time
@@ -236,31 +242,106 @@ contentToJson model content =
 
 type alias Flags =
     { editModeInt : Maybe Int
+    , currentDocumentIndex : Maybe Int
     }
+
+
+modelWithDocumentProcessed : Int -> Model -> Model
+modelWithDocumentProcessed index model =
+    case Array.get index model.documentSources of
+        Just source ->
+            let
+                parsed =
+                    parseDocument parseExpressions source
+
+                processed =
+                    processDocumentWithModel model parsed
+
+                parsedDocuments =
+                    Dict.insert index parsed model.parsedDocuments
+
+                processedDocuments =
+                    Dict.insert index processed model.processedDocuments
+            in
+                { model
+                    | parsedDocuments = parsedDocuments
+                    , processedDocuments = processedDocuments
+                }
+
+        Nothing ->
+            model
+
+
+modelWithCurrentDocumentProcessed : Model -> Model
+modelWithCurrentDocumentProcessed model =
+    case model.nav of
+        Document index ->
+            modelWithDocumentProcessed index model
+        
+        _ ->
+            model
 
 
 init : Flags -> ( Model, Cmd Message )
 init flags =
-    { documentSources =
-        [ Samples.Welcome.source
-        , Samples.Clock.source
-        , Samples.Button.source
-        , Samples.Images.source
-        , Samples.API.source
-        , "# Now your turn!"
-        ]
-            |> Array.fromList
-    , nav = Document 0
-    , editMode =
-        flags.editModeInt
-            |> Maybe.andThen editModeFromInt
-            |> Maybe.withDefault WithPreview
-    , now = 0
-    , sectionInputs = Dict.empty
-    , rpcResponses = Dict.empty
-    }
-        ! [ Cmd.none
-          ]
+    let
+        documentSources =
+            [ Samples.Welcome.source
+            , Samples.Clock.source
+            , Samples.Button.source
+            , Samples.Images.source
+            , Samples.API.source
+            , "# Now your turn!"
+            ]
+                |> Array.fromList
+
+        maybeDocumentIndex =
+            case flags.currentDocumentIndex of
+                Just index ->
+                    if index >= 0 && index < Array.length documentSources then
+                        Just index
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+        model =
+            { documentSources =
+                [ Samples.Welcome.source
+                , Samples.Clock.source
+                , Samples.Button.source
+                , Samples.Images.source
+                , Samples.API.source
+                , "# Now your turn!"
+                ]
+                    |> Array.fromList
+            , parsedDocuments = Dict.empty
+            , processedDocuments = Dict.empty
+            , nav =
+                case maybeDocumentIndex of
+                    Just index ->
+                        Document index
+
+                    Nothing ->
+                        DocumentsList
+            , editMode =
+                flags.editModeInt
+                    |> Maybe.andThen editModeFromInt
+                    |> Maybe.withDefault WithPreview
+            , now = 0
+            , sectionInputs = Dict.empty
+            , rpcResponses = Dict.empty
+            }
+    in
+        (case maybeDocumentIndex of
+            Just index ->
+                modelWithDocumentProcessed index model
+
+            Nothing ->
+                model
+        )
+            ! []
 
 
 type Message
@@ -281,16 +362,21 @@ update msg model =
     case msg of
         ChangeDocumentSource newInput ->
             let
-                documentSources =
+                newModel =
                     case model.nav of
                         Document index ->
-                            model.documentSources
-                                |> Array.set index newInput
+                            let
+                                documentSources =
+                                    model.documentSources
+                                        |> Array.set index newInput
+                            in
+                                { model | documentSources = documentSources }
+                                    |> modelWithDocumentProcessed index
 
                         _ ->
-                            model.documentSources
+                            model
             in
-                ( { model | documentSources = documentSources }, Cmd.none )
+                ( newModel, Cmd.none )
 
         GoToDocumentsList ->
             ( { model | nav = DocumentsList }, Cmd.none )
@@ -304,8 +390,12 @@ update msg model =
 
                         Document index ->
                             max 0 (index - 1)
+
+                newModel =
+                    { model | nav = Document newIndex }
+                        |> modelWithDocumentProcessed newIndex
             in
-                ( { model | nav = Document newIndex }, Cmd.none )
+                newModel ! []
 
         GoToNextDocument ->
             let
@@ -319,11 +409,20 @@ update msg model =
 
                         Document index ->
                             min maxIndex (index + 1)
-            in
-                ( { model | nav = Document newIndex }, Cmd.none )
 
-        GoToDocumentAtIndex index ->
-            ( { model | nav = Document index }, Cmd.none )
+                newModel =
+                    { model | nav = Document newIndex }
+                        |> modelWithDocumentProcessed newIndex
+            in
+                newModel ! []
+
+        GoToDocumentAtIndex newIndex ->
+            let
+                newModel =
+                    { model | nav = Document newIndex }
+                        |> modelWithDocumentProcessed newIndex
+            in
+                newModel ! []
 
         NewDocument ->
             let
@@ -348,7 +447,12 @@ update msg model =
                 documentSources =
                     Array.append prefix suffix
             in
-                ( { model | documentSources = documentSources }, Cmd.none )
+                { model
+                    | documentSources = documentSources
+                    , parsedDocuments = Dict.empty
+                    , processedDocuments = Dict.empty
+                }
+                    ! []
 
         ChangeSectionInput sectionTitle newInput ->
             let
@@ -358,28 +462,82 @@ update msg model =
                 newSectionInputs =
                     model.sectionInputs
                         |> Dict.insert sectionTitle newValue
+                
+                maybeIndex =
+                    case model.nav of
+                        Document index ->
+                            Just index
+                        
+                        _ ->
+                            Nothing
+
+                newModel =
+                    { model | sectionInputs = newSectionInputs }
             in
-                ( { model | sectionInputs = newSectionInputs }, Cmd.none )
+                modelWithCurrentDocumentProcessed newModel ! []
 
         Time time ->
-            ( { model | now = time }, Cmd.none )
+            let
+                newModel =
+                    case model.nav of
+                        Document index ->
+                            let
+                                modelWithTime =
+                                    { model | now = time }
+
+                                maybeParsed =
+                                    case Dict.get index model.parsedDocuments of
+                                        Just parsed ->
+                                            Just ( True, parsed )
+
+                                        Nothing ->
+                                            case Array.get index model.documentSources of
+                                                Just source ->
+                                                    Just ( False, parseDocument parseExpressions source )
+
+                                                Nothing ->
+                                                    Nothing
+                            in
+                                case maybeParsed of
+                                    Just ( cached, parsed ) ->
+                                        let
+                                            processed =
+                                                processDocumentWithModel model parsed
+
+                                            parsedDocuments =
+                                                if cached then
+                                                    model.parsedDocuments
+                                                else
+                                                    Dict.insert index parsed model.parsedDocuments
+
+                                            processedDocuments =
+                                                Dict.insert index processed model.processedDocuments
+                                        in
+                                            { model
+                                                | parsedDocuments = parsedDocuments
+                                                , processedDocuments = processedDocuments
+                                                , now = time
+                                            }
+
+                                    Nothing ->
+                                        model
+
+                        _ ->
+                            model
+            in
+                ( newModel, Cmd.none )
 
         BeginLoading ->
             let
-                maybeDocument =
+                maybeResolvedDocument =
                     case model.nav of
                         Document index ->
-                            Array.get index model.documentSources
-                                |> Maybe.map (parseDocument parseExpressions)
+                            Dict.get index model.processedDocuments
 
                         _ ->
                             Nothing
 
-                maybeResolvedDocument =
-                    maybeDocument
-                        |> Maybe.map (processDocumentWithModel model)
-
-                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) (Result Error (List (List Token))) ) -> List Rpc
+                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List Rpc
                 rpcsFromSection ( title, section ) =
                     case section of
                         ResolvedSection { rpcs } ->
@@ -398,14 +556,14 @@ update msg model =
                     rpcs
                         |> List.filterMap (Datadown.Rpc.toCommand RpcResponded)
             in
-                ( model, Cmd.batch commands )
+                model ! commands
 
         RpcResponded response ->
             let
                 rpcResponses =
                     Dict.insert response.id (Just response) model.rpcResponses
             in
-                ( { model | rpcResponses = rpcResponses }, Cmd.none )
+                modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! []
 
 
 subscriptions : Model -> Sub Message
@@ -720,7 +878,7 @@ viewDocumentNavigation model =
                             GoToNextDocument
                             [ class "px-2 py-1 text-indigo-lightest" ]
                             [ viewFontAwesomeIcon "caret-right" ]
-                        , button [ onClick BeginLoading, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
+                        , button [ onClick BeginLoading, class "px-2 py-1 text-yellow-lighter" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
                         ]
         ]
 
@@ -753,9 +911,6 @@ viewDocuments model =
 
                         Nothing ->
                             em [] [ text "Untitled" ]
-
-                document =
-                    parseDocument parseExpressions documentSource
             in
                 h2 [ class "" ]
                     [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
@@ -776,17 +931,9 @@ processDocumentWithModel model document =
     processDocument (evaluateExpressions model) (contentToJson model) document
 
 
-viewDocumentPreview : Model -> String -> Html Message
-viewDocumentPreview model documentSource =
+viewDocumentPreview : Model -> Resolved Evaluate.Error Expressions -> Html Message
+viewDocumentPreview model resolved =
     let
-        document : Document (Result Error (List (List Token)))
-        document =
-            parseDocument parseExpressions documentSource
-
-        resolved : Resolved Evaluate.Error (Result Error (List (List Token)))
-        resolved =
-            processDocumentWithModel model document
-
         displayOptions : DisplayOptions
         displayOptions =
             { compact = False
@@ -816,15 +963,15 @@ viewDocumentPreview model documentSource =
     in
         div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
             [ div [ row, class "mb-4" ]
-                [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text document.title ]
+                [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text resolved.title ]
                 ]
             , div [ class "pr-4" ] introHtml
             , div [ class "pr-4" ] sectionsHtml
             ]
 
 
-viewDocumentSource : Model -> String -> Html Message
-viewDocumentSource model documentSource =
+viewDocumentSource : Model -> String -> Resolved Evaluate.Error Expressions -> Html Message
+viewDocumentSource model documentSource resolvedDocument =
     let
         editorHtml =
             case model.editMode of
@@ -842,7 +989,7 @@ viewDocumentSource model documentSource =
                     text ""
 
                 _ ->
-                    viewDocumentPreview model documentSource
+                    viewDocumentPreview model resolvedDocument
     in
         div [ col, class "flex-1 h-screen" ]
             [ div [ row, class "mb-8 bg-indigo-darkest" ]
@@ -863,8 +1010,10 @@ view model =
                 viewDocuments model
 
             Document index ->
-                Array.get index model.documentSources
-                    |> Maybe.map (viewDocumentSource model)
+                Maybe.map2
+                    (viewDocumentSource model)
+                    (Array.get index model.documentSources)
+                    (Dict.get index model.processedDocuments)
                     |> Maybe.withDefault (div [] [ text "No document" ])
 
         -- , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]

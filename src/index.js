@@ -17,5 +17,6 @@ function parseIntOrNull(input) {
 
 const mountNode = document.getElementById('app')
 const app = Elm.Main.embed(mountNode, {
-  editModeInt: parseIntOrNull(query['editMode'])
+  editModeInt: parseIntOrNull(query['editMode']),
+  currentDocumentIndex: 0
 })

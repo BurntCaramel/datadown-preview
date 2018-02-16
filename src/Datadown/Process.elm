@@ -47,7 +47,8 @@ type Error e
 
 
 type alias Resolved e a =
-    { sections : List ( String, ResolvedSection (Error e) a )
+    { title : String
+    , sections : List ( String, ResolvedSection (Error e) a )
     , intro : List (Result (Error e) (Content a))
     , tests : List (Document a)
     }
@@ -587,7 +588,8 @@ processDocumentWith evaluateComponent evaluateExpression contentToJson document 
                     ResolvedSection { mainContent } ->
                         mainContent
     in
-        { sections = resolvedSections
+        { title = document.title
+        , sections = resolvedSections
         , intro = resolvedIntro
         , tests = []
         }
