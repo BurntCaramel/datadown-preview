@@ -54,7 +54,6 @@ type alias Model =
     , now : Time
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
-    , loadedJson : Dict String (Maybe (Result Http.Error JsonValue))
     }
 
 
@@ -284,7 +283,6 @@ third
     , now = 0
     , sectionInputs = Dict.empty
     , rpcResponses = Dict.empty
-    , loadedJson = Dict.empty
     }
         ! [ Cmd.none
           ]
@@ -300,7 +298,6 @@ type Message
     | ChangeSectionInput String String
     | Time Time
     | BeginLoading
-    | JsonLoaded String (Result Http.Error JsonValue)
     | RpcResponded Datadown.Rpc.Response
 
 
@@ -434,14 +431,6 @@ update msg model =
                     Dict.insert response.id (Just response) model.rpcResponses
             in
                 ( { model | rpcResponses = rpcResponses }, Cmd.none )
-
-        JsonLoaded key json ->
-            let
-                loadedJson =
-                    model.loadedJson
-                        |> Dict.insert key (Just json)
-            in
-                ( { model | loadedJson = loadedJson }, Cmd.none )
 
 
 subscriptions : Model -> Sub Message
