@@ -518,7 +518,7 @@ viewRpc rpc maybeResponse =
                 Just (Just response) ->
                     case response.result of
                         Ok json ->
-                            ("bg-green-lighter", span [] [ text "Success" ], Just <| Preview.Json.viewJson json)
+                            ("bg-green-lighter", span [ class "summary-indicator-inline" ] [ text "Success" ], Just <| Preview.Json.viewJson json)
                         
                         Err error ->
                             let
@@ -529,7 +529,7 @@ viewRpc rpc maybeResponse =
                                     ]
                                         |> String.join " "
                             in
-                                ("bg-red-lighter", span [] [ text statusText ], Maybe.map Preview.Json.viewJson error.data)
+                                ("bg-red-lighter", span [ class "summary-indicator-inline" ] [ text statusText ], Maybe.map Preview.Json.viewJson error.data)
     in
         div []
             [ details []
@@ -544,7 +544,7 @@ viewRpc rpc maybeResponse =
             , case maybeResponseHtml of
                     Just responseHtml ->
                         details []
-                            [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer summary-indicator-inline", class loadingClasses ]
+                            [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
                                 [ responseStatusHtml ]
                             , responseHtml
                             ]
