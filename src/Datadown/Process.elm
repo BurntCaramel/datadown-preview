@@ -35,6 +35,7 @@ import Http
 -}
 type Error e
     = NoValueForIdentifier String
+    | NoValueForKeyPath (List String)
     | CannotConvertContent
     | NoSection String
     | UnknownKind
@@ -278,10 +279,10 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
     case keyPath of
         firstKey :: otherKeys ->
             let
-                magicContent : List (Result (Error e) (Content a)) -> Maybe (Content a)
+                magicContent : Result (Error e) (Content a) -> Maybe (Content a)
                 magicContent content =
                     case content of
-                        [ Ok (Json json) ] ->
+                        Ok (Json json) ->
                             case Rpc.fromJsonValue json of
                                 Just rpc ->
                                     Just (Reference rpc.id otherKeys)
@@ -292,37 +293,38 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                         _ ->
                             Nothing
 
+                resolveContentResult : Result (Error e) (Content a) -> Result (Error e) (Content a)
+                resolveContentResult contentResult =
+                    case magicContent contentResult of
+                        Just content ->
+                            Ok content
+
+                        Nothing ->
+                            if otherKeys == [] then
+                                contentResult
+                            else
+                                case contentResult of
+                                    Ok (Json json) ->
+                                        json
+                                            |> JsonValue.getIn otherKeys
+                                            |> Result.mapError (always (NoValueForKeyPath keyPath))
+                                            |> Result.map Json
+
+                                    _ ->
+                                        Err (NoValueForKeyPath keyPath)
+
                 findContentInSection : ( String, ResolvedSection (Error e) a ) -> Maybe (List (Result (Error e) (Content a)))
                 findContentInSection ( key, resolvedSection ) =
                     case resolvedSection of
                         ResolvedSection record ->
                             if key == firstKey then
-                                case magicContent record.mainContent of
-                                    Just content ->
-                                        Ok content
-                                            |> List.singleton
-                                            |> Just
-
-                                    Nothing ->
-                                        if otherKeys == [] then
-                                            case record.mainContent of
-                                                [] ->
-                                                    Nothing
-
-                                                _ ->
-                                                    Just record.mainContent
-                                        else
-                                            case record.mainContent of
-                                                [ Ok (Json json) ] ->
-                                                    json
-                                                        |> JsonValue.getIn otherKeys
-                                                        |> Result.toMaybe
-                                                        |> Maybe.map
-                                                            (Json >> Ok >> List.singleton)
-
-                                                _ ->
-                                                    otherKeys
-                                                        |> contentForKeyPathInResolvedSections record.subsections
+                                case record.mainContent of
+                                    [] ->
+                                        otherKeys
+                                            |> contentForKeyPathInResolvedSections record.subsections
+                                        
+                                    _ ->
+                                        Just (List.map resolveContentResult record.mainContent)
                             else
                                 Nothing
 
