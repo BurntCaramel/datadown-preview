@@ -78,6 +78,15 @@ type Token
 --     | If (Expression Bool) (Expression t) (Expression t)
 
 
+isIdentifierHeadChar : Char -> Bool
+isIdentifierHeadChar c =
+    Char.isLower c
+        || c
+        == '.'
+        || c
+        == '_'
+
+
 isIdentifierTailChar : Char -> Bool
 isIdentifierTailChar c =
     Char.isLower c
@@ -91,7 +100,7 @@ isIdentifierTailChar c =
 
 identifier : Parser Token
 identifier =
-    variable Char.isLower isIdentifierTailChar Set.empty
+    variable isIdentifierHeadChar isIdentifierTailChar Set.empty
         |> map Identifier
 
 

@@ -242,7 +242,34 @@ type alias Flags =
 init : Flags -> ( Model, Cmd Message )
 init flags =
     { documentSources =
-        [ Samples.Welcome.source
+        [ """
+# Mapping lists
+
+## items
+first
+
+second
+
+third
+
+## data
+```json
+{ "key": "value" }
+```
+
+## view
+
+```html
+{{#data}}
+{{ .key }}
+{{/data}}
+
+{{#items}}
+<p>{{ . }}</p>
+{{/items}}
+```
+"""
+        , Samples.Welcome.source
         , Samples.Clock.source
         , Samples.Images.source
         , Samples.API.source
