@@ -1,13 +1,12 @@
 module Main exposing (main)
 
 import Html exposing (..)
-import Html.Attributes exposing (class, id, rows, attribute, value)
+import Html.Attributes exposing (class, id, rows, attribute, value, disabled)
 import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
 import Array exposing (Array)
 import Dict exposing (Dict)
-import Http
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
@@ -186,17 +185,18 @@ valueForRpcID model id keyPath =
                         response.result
                             |> Result.mapError Evaluate.Rpc
                             |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
-                    
+
                     "error" :: otherKeys ->
                         case response.result of
                             Err error ->
                                 error
                                     |> Datadown.Rpc.errorToJsonValue
-                                    |> JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier
-                            
+                                    |> JsonValue.getIn otherKeys
+                                    >> Result.mapError Evaluate.NoValueForIdentifier
+
                             _ ->
                                 Ok (JsonValue.NullValue)
-                    
+
                     _ ->
                         Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
 
@@ -226,7 +226,7 @@ contentToJson model content =
 
         Code maybeLanguage source ->
             Ok <| JsonValue.StringValue <| String.trim source
-        
+
         Reference id keyPath ->
             valueForRpcID model id keyPath
 
@@ -476,19 +476,19 @@ viewCode options maybeLanguage source =
 viewRpc : Rpc -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
 viewRpc rpc maybeResponse =
     let
-        (loadingClasses, responseStatusHtml, maybeResponseHtml) =
+        ( loadingClasses, responseStatusHtml, maybeResponseHtml ) =
             case maybeResponse of
                 Nothing ->
-                    ("bg-grey-lighter", text "Not loaded", Nothing)
-                
+                    ( "bg-grey-lighter", text "Not loaded", Nothing )
+
                 Just Nothing ->
-                    ("bg-orange-lighter", text "Loading…", Nothing)
-                
+                    ( "bg-orange-lighter", text "Loading…", Nothing )
+
                 Just (Just response) ->
                     case response.result of
                         Ok json ->
-                            ("bg-green-lighter", span [ class "summary-indicator-inline" ] [ text "Success" ], Just <| Preview.Json.viewJson json)
-                        
+                            ( "bg-green-lighter", span [ class "summary-indicator-inline" ] [ text "Success" ], Just <| Preview.Json.viewJson json )
+
                         Err error ->
                             let
                                 statusText =
@@ -498,12 +498,12 @@ viewRpc rpc maybeResponse =
                                     ]
                                         |> String.join " "
                             in
-                                ("bg-red-lighter", span [ class "summary-indicator-inline" ] [ text statusText ], Maybe.map Preview.Json.viewJson error.data)
+                                ( "bg-red-lighter", span [ class "summary-indicator-inline" ] [ text statusText ], Maybe.map Preview.Json.viewJson error.data )
     in
         div []
             [ details []
                 [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic text-white bg-grey-darker cursor-pointer" ]
-                    [ span [ class "pr-2 summary-indicator-inline" ] [ text rpc.method]
+                    [ span [ class "pr-2 summary-indicator-inline" ] [ text rpc.method ]
                     , span [] [ text rpc.id ]
                     ]
                 , rpc.params
@@ -511,16 +511,16 @@ viewRpc rpc maybeResponse =
                     |> Maybe.withDefault (text "")
                 ]
             , case maybeResponseHtml of
-                    Just responseHtml ->
-                        details []
-                            [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
-                                [ responseStatusHtml ]
-                            , responseHtml
-                            ]
-
-                    Nothing ->
-                        div [ class "px-2 py-1 font-mono text-xs italic", class loadingClasses ]
+                Just responseHtml ->
+                    details []
+                        [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
                             [ responseStatusHtml ]
+                        , responseHtml
+                        ]
+
+                Nothing ->
+                    div [ class "px-2 py-1 font-mono text-xs italic", class loadingClasses ]
+                        [ responseStatusHtml ]
             ]
 
 
@@ -566,9 +566,9 @@ viewContent options content =
                     |> List.map makeSectionViewModel
                     |> List.map (viewSection [] options)
                     |> div [ class "pl-6 border-l border-teal" ]
-        
+
         Reference id keyPath ->
-            div [] [ text "Reference: ", text <| toString id]
+            div [] [ text "Reference: ", text <| toString id ]
 
 
 viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
@@ -691,13 +691,37 @@ viewDocumentNavigation model =
                     ]
 
             Document index ->
-                div [ row, class "h-8 self-end flex-shrink items-center" ]
-                    [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
-                    , button [ onClick GoToPreviousDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-left" ]
-                    , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
-                    , button [ onClick GoToNextDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "caret-right" ]
-                    , button [ onClick BeginLoading, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
-                    ]
+                let
+                    canGoPrevious =
+                        index /= 0
+
+                    canGoNext =
+                        index < Array.length model.documentSources - 1
+
+                    button2 isDisabled clickMsg attributes children =
+                        button
+                            ((if isDisabled then
+                                [ disabled True, class "opacity-25" ]
+                              else
+                                [ onClick clickMsg ]
+                             )
+                                ++ attributes
+                            )
+                            children
+                in
+                    div [ row, class "h-8 self-end flex-shrink items-center" ]
+                        [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
+                        , button2 (not canGoPrevious)
+                            GoToPreviousDocument
+                            [ class "px-2 py-1 text-indigo-lightest" ]
+                            [ viewFontAwesomeIcon "caret-left" ]
+                        , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
+                        , button2 (not canGoNext)
+                            GoToNextDocument
+                            [ class "px-2 py-1 text-indigo-lightest" ]
+                            [ viewFontAwesomeIcon "caret-right" ]
+                        , button [ onClick BeginLoading, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
+                        ]
         ]
 
 

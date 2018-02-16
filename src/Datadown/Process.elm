@@ -226,20 +226,20 @@ mustache evaluateComponent resolveVariable =
                 inner : String
                 inner =
                     case match.submatches of
-                        _ :: Just string :: [] ->
+                        _ :: (Just string) :: [] ->
                             string
-                        
+
                         _ ->
                             ""
-                
+
                 passes json =
                     case json of
                         JsonValue.BoolValue False ->
                             False
-                        
+
                         JsonValue.NullValue ->
                             False
-                        
+
                         _ ->
                             True
 
@@ -247,19 +247,19 @@ mustache evaluateComponent resolveVariable =
                     case value of
                         Nothing ->
                             []
-                        
+
                         Just (JsonValue.ArrayValue items) ->
                             items
                                 |> List.filter passes
-                        
+
                         Just (JsonValue.BoolValue False) ->
                             []
-                        
-                        Just (JsonValue.NullValue) ->
+
+                        Just JsonValue.NullValue ->
                             []
-                        
+
                         Just value ->
-                            [value]
+                            [ value ]
             in
                 values
                     |> List.map (\value -> process (Just value) inner)
@@ -274,7 +274,7 @@ mustache evaluateComponent resolveVariable =
                 |> resolveVariable context
                 |> Maybe.map jsonToString
                 |> Maybe.withDefault "?"
-        
+
         process context input =
             input
                 |> processCustomElements evaluateComponent
@@ -298,10 +298,10 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                             case Rpc.fromJsonValue json of
                                 Just rpc ->
                                     Just (Reference rpc.id otherKeys)
-                                
+
                                 Nothing ->
                                     Nothing
-                        
+
                         _ ->
                             Nothing
 
@@ -312,22 +312,22 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                             [ Ok content ]
 
                         Nothing ->
-                        case contentResult of
-                            Ok (Json json) ->
-                                json
-                                    |> JsonValue.getIn otherKeys
-                                    |> Result.mapError (always (NoValueForKeyPath keyPath))
-                                    |> Result.map Json
-                                    |> List.singleton
+                            case contentResult of
+                                Ok (Json json) ->
+                                    json
+                                        |> JsonValue.getIn otherKeys
+                                        |> Result.mapError (always (NoValueForKeyPath keyPath))
+                                        |> Result.map Json
+                                        |> List.singleton
 
-                            Ok (List items) ->
-                                List.map Ok items
+                                Ok (List items) ->
+                                    List.map Ok items
 
-                            _ ->
-                                if otherKeys == [] then
-                                    [ contentResult ]
-                                else
-                                    [ Err (NoValueForKeyPath keyPath) ]
+                                _ ->
+                                    if otherKeys == [] then
+                                        [ contentResult ]
+                                    else
+                                        [ Err (NoValueForKeyPath keyPath) ]
 
                 findContentInSection : ( String, ResolvedSection (Error e) a ) -> Maybe (List (Result (Error e) (Content a)))
                 findContentInSection ( key, resolvedSection ) =
@@ -338,7 +338,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                     [] ->
                                         otherKeys
                                             |> contentForKeyPathInResolvedSections record.subsections
-                                        
+
                                     _ ->
                                         Just (List.concatMap resolveContentResult record.mainContent)
                             else
@@ -501,12 +501,12 @@ nextProcessedSection evaluateComponent evaluateExpression contentToJson section 
                 keyPath =
                     key
                         |> String.split "."
-                
+
                 conformPath pathIn =
                     case pathIn of
-                        [""] ->
+                        [ "" ] ->
                             []
-                        
+
                         path ->
                             path
             in
@@ -518,7 +518,7 @@ nextProcessedSection evaluateComponent evaluateExpression contentToJson section 
                                     |> JsonValue.getIn (conformPath otherKeys)
                                     |> Result.mapError (always (NoValueForKeyPath keyPath))
                                     |> Result.map (Json >> List.singleton)
-                            
+
                             Nothing ->
                                 Err (NoValueForKeyPath keyPath)
 

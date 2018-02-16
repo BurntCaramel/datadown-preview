@@ -67,7 +67,7 @@ fromJsonValue json =
             let
                 dict =
                     Dict.fromList pairs
-                
+
                 hasVersion =
                     Dict.member "jsonrpc" dict
 
@@ -129,16 +129,16 @@ toCommand toMessage rpc =
                     case httpError of
                         Http.BadUrl url ->
                             Error 0 url Nothing
-                        
+
                         Http.Timeout ->
                             Error 0 "Timed out" Nothing
 
                         Http.NetworkError ->
                             Error 0 (toString httpError) Nothing
-                        
+
                         Http.BadStatus r ->
                             Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)
-                        
+
                         Http.BadPayload message r ->
                             Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)
 
@@ -170,8 +170,8 @@ toCommand toMessage rpc =
 
 errorToJsonValue : Error -> JsonValue
 errorToJsonValue error =
-    [ Just ("code", JsonValue.NumericValue <| toFloat error.code)
-    , Just ("message", JsonValue.StringValue error.message)
+    [ Just ( "code", JsonValue.NumericValue <| toFloat error.code )
+    , Just ( "message", JsonValue.StringValue error.message )
     , Maybe.map ((,) "data") error.data
     ]
         |> List.filterMap identity
