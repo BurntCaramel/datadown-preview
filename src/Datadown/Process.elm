@@ -250,6 +250,7 @@ mustache evaluateComponent resolveVariable =
                         
                         Just (JsonValue.ArrayValue items) ->
                             items
+                                |> List.filter passes
                         
                         Just (JsonValue.BoolValue False) ->
                             []
