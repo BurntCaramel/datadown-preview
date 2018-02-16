@@ -588,7 +588,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
     case contentResults of
         [] ->
             if options.hideNoContent then
-                [ text "" ]
+                []
             else
                 let
                     baseTitle =
@@ -780,15 +780,15 @@ viewDocumentPreview model documentSource =
 
         introHtml : List (Html Message)
         introHtml =
-            resolved.intro
-                |> viewContentResults
-                    { displayOptions
-                        | compact = True
-                        , hideNoContent = True
-                    }
-                    []
-                    "intro"
-                    []
+            viewContentResults
+                { displayOptions
+                    | compact = True
+                    , hideNoContent = True
+                }
+                []
+                "intro"
+                resolved.intro
+                []
     in
         div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
             [ div [ row, class "mb-4" ]
