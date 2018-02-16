@@ -304,25 +304,29 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                         _ ->
                             Nothing
 
-                resolveContentResult : Result (Error e) (Content a) -> Result (Error e) (Content a)
+                resolveContentResult : Result (Error e) (Content a) -> List (Result (Error e) (Content a))
                 resolveContentResult contentResult =
                     case magicContent contentResult of
                         Just content ->
-                            Ok content
+                            [ Ok content ]
 
                         Nothing ->
-                            if otherKeys == [] then
-                                contentResult
-                            else
-                                case contentResult of
-                                    Ok (Json json) ->
-                                        json
-                                            |> JsonValue.getIn otherKeys
-                                            |> Result.mapError (always (NoValueForKeyPath keyPath))
-                                            |> Result.map Json
+                        case contentResult of
+                            Ok (Json json) ->
+                                json
+                                    |> JsonValue.getIn otherKeys
+                                    |> Result.mapError (always (NoValueForKeyPath keyPath))
+                                    |> Result.map Json
+                                    |> List.singleton
 
-                                    _ ->
-                                        Err (NoValueForKeyPath keyPath)
+                            Ok (List items) ->
+                                List.map Ok items
+
+                            _ ->
+                                if otherKeys == [] then
+                                    [ contentResult ]
+                                else
+                                    [ Err (NoValueForKeyPath keyPath) ]
 
                 findContentInSection : ( String, ResolvedSection (Error e) a ) -> Maybe (List (Result (Error e) (Content a)))
                 findContentInSection ( key, resolvedSection ) =
@@ -335,7 +339,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                             |> contentForKeyPathInResolvedSections record.subsections
                                         
                                     _ ->
-                                        Just (List.map resolveContentResult record.mainContent)
+                                        Just (List.concatMap resolveContentResult record.mainContent)
                             else
                                 Nothing
 
