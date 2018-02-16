@@ -149,29 +149,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
         resolveWithModel key =
             case resolveFromDocument key of
                 Ok value ->
-                    case value of
-                    --     JsonValue.ArrayValue [ item ] ->
-                    --         case Datadown.Rpc.fromJsonValue item of
-                    --             Just rpc ->
-                    --                 let
-                    --                     maybeMaybeResponse =
-                    --                         Dict.get rpc.id model.rpcResponses
-                    --                 in
-                    --                     case maybeMaybeResponse of
-                    --                         Nothing ->
-                    --                             Ok (JsonValue.StringValue "Needs loading")
-
-                    --                         Just Nothing ->
-                    --                             Ok (JsonValue.StringValue "Loading…")
-
-                    --                         Just (Just response) ->
-                    --                             Ok (JsonValue.StringValue (toString response.result))
-
-                    --             Nothing ->
-                    --                 Ok value
-
-                        _ ->
-                            Ok value
+                    Ok value
 
                 Err error ->
                     case valueFromModel model key of
