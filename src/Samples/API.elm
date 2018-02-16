@@ -16,10 +16,10 @@ HTTP.get_json post_url
 ## view
 ```html
 {{#post.error}}
-<p>Error: {{ post.error.message }}</p>
+<p>Error: {{ .message }}</p>
 {{/post.error}}
 {{#post.result}}
-<p>{{ post.result.title }}</p>
+<p>{{ .title }}</p>
 {{/post.result}}
 ```
 """
