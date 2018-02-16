@@ -21,6 +21,7 @@ import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
 import Samples.Welcome
 import Samples.Clock
+import Samples.Button
 import Samples.Images
 import Samples.API
 
@@ -241,35 +242,9 @@ type alias Flags =
 init : Flags -> ( Model, Cmd Message )
 init flags =
     { documentSources =
-        [ """
-# Mapping lists
-
-## items
-first
-
-second
-
-third
-
-## data
-```json
-{ "key": "value" }
-```
-
-## view
-
-```html
-{{#data}}
-{{ .key }}
-{{/data}}
-
-{{#items}}
-<p>{{ . }}</p>
-{{/items}}
-```
-"""
-        , Samples.Welcome.source
+        [ Samples.Welcome.source
         , Samples.Clock.source
+        , Samples.Button.source
         , Samples.Images.source
         , Samples.API.source
         , "# Now your turn!"

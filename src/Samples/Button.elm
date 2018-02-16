@@ -7,9 +7,6 @@ source =
 
 A button similar to Bootstrap 4’s.
 
-## props
-### style
-
 ## content
 Button
 
