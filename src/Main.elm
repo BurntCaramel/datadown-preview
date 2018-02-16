@@ -685,9 +685,9 @@ viewDocumentNavigation model =
     div [ class "fixed w-full h-8 bg-indigo-darkest", class "bg-red" ]
         [ case model.nav of
             DocumentsList ->
-                div [ row, class "h-8 justify-between" ]
+                div [ row, class "px-2 h-8 justify-between" ]
                     [ button [ onClick NewDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "plus", text " New" ]
-                    , button [ class "px-2 py-1 text-purple-dark bg-purple-lightest border border-purple-lighter rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
+                    , button [ class "px-2 py-1 text-indigo-lightest rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
 
             Document index ->
@@ -758,7 +758,7 @@ viewDocuments model =
                     parseDocument parseExpressions documentSource
             in
                 h2 [ class "" ]
-                    [ button [ class "w-full px-4 py-2 text-left text-3xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
+                    [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
                         [ titleHtml ]
                     ]
     in
