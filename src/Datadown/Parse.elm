@@ -61,7 +61,7 @@ processContentBlock parseExpressions block =
         urlFromInline inline =
             case inline of
                 Link url maybeTitle innerInlines ->
-                    [ url ] |> Debug.log "Found url"
+                    [ url ]
 
                 _ ->
                     []
