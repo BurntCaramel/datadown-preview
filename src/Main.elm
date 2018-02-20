@@ -277,7 +277,7 @@ modelWithCurrentDocumentProcessed model =
     case model.nav of
         Document index ->
             modelWithDocumentProcessed index model
-        
+
         _ ->
             model
 
@@ -462,12 +462,12 @@ update msg model =
                 newSectionInputs =
                     model.sectionInputs
                         |> Dict.insert sectionTitle newValue
-                
+
                 maybeIndex =
                     case model.nav of
                         Document index ->
                             Just index
-                        
+
                         _ ->
                             Nothing
 
