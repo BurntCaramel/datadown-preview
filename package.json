@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Describe datadown-preview here",
   "scripts": {
-    "build": "nwb build-web-app",
+    "build": "nwb build-web-app && cp src/_redirects dist/_redirects",
     "clean": "nwb clean-app",
     "dev": "nwb serve-web-app --reload",
     "test": "nwb test",
