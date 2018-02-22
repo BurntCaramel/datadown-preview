@@ -203,14 +203,6 @@ operator =
             |. symbol ">="
         , succeed (GreaterThan False)
             |. symbol ">"
-        , succeed (MathModule Sine)
-            |. keyword "Math.sin"
-        , succeed (MathModule Cosine)
-            |. keyword "Math.cos"
-        , succeed (MathModule Tangent)
-            |. keyword "Math.tan"
-        , succeed (MathModule Turns)
-            |. keyword "Math.turns"
         , succeed (HttpModule GetJson)
             |. keyword "HTTP.get_json"
         ]
