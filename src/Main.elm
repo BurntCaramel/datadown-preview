@@ -349,6 +349,7 @@ type Message
     | ChangeSectionInput String String
     | Time Time
     | BeginLoading
+    | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
 
 
@@ -560,6 +561,48 @@ update msg model =
                         |> List.filterMap (Datadown.Rpc.toCommand RpcResponded)
             in
                 model ! commands
+        
+        BeginRpcWithID id reload ->
+            let
+                maybeResolvedDocument =
+                    case model.route of
+                        Just (Document index _) ->
+                            Dict.get index model.processedDocuments
+
+                        _ ->
+                            Nothing
+
+                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List Rpc
+                rpcsFromSection ( title, section ) =
+                    case section of
+                        ResolvedSection { rpcs } ->
+                            rpcs
+
+                rpcs =
+                    case maybeResolvedDocument of
+                        Just resolved ->
+                            resolved.sections
+                                |> List.concatMap rpcsFromSection
+
+                        Nothing ->
+                            []
+                
+                maybeRpc =
+                    rpcs
+                        |> List.filter (\rpc -> rpc.id == id)
+                        |> List.head
+            in
+                case maybeRpc of
+                    Just rpc ->
+                        case Datadown.Rpc.toCommand RpcResponded rpc of
+                            Just command ->
+                                model ! [ command ]
+                            
+                            Nothing ->
+                                model ! []
+                    
+                    Nothing ->
+                        model ! []
 
         RpcResponded response ->
             let
@@ -640,10 +683,13 @@ viewCode options maybeLanguage source =
 viewRpc : Rpc -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
 viewRpc rpc maybeResponse =
     let
+        loadButton =
+            button [ onClick <| BeginRpcWithID rpc.id True, class "w-full text-left" ] [ text "Load" ]
+
         ( loadingClasses, responseStatusHtml, maybeResponseHtml ) =
             case maybeResponse of
                 Nothing ->
-                    ( "bg-grey-lighter", text "Not loaded", Nothing )
+                    ( "bg-yellow-lighter", loadButton, Nothing )
 
                 Just Nothing ->
                     ( "bg-orange-lighter", text "Loading…", Nothing )
@@ -677,13 +723,13 @@ viewRpc rpc maybeResponse =
             , case maybeResponseHtml of
                 Just responseHtml ->
                     details []
-                        [ summary [ class "px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
+                        [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
                             [ responseStatusHtml ]
                         , responseHtml
                         ]
 
                 Nothing ->
-                    div [ class "px-2 py-1 font-mono text-xs italic", class loadingClasses ]
+                    div [ class "flex justify-between px-2 py-1 font-mono text-xs italic", class loadingClasses ]
                         [ responseStatusHtml ]
             ]
 
