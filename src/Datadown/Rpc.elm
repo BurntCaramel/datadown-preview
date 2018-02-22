@@ -128,13 +128,13 @@ toCommand toMessage rpc =
                 convertError httpError =
                     case httpError of
                         Http.BadUrl url ->
-                            Error 0 url Nothing
+                            Error 0 ("Bad URL: " ++ url) Nothing
 
                         Http.Timeout ->
                             Error 0 "Timed out" Nothing
 
                         Http.NetworkError ->
-                            Error 0 (toString httpError) Nothing
+                            Error 0 "Unable to connect" Nothing
 
                         Http.BadStatus r ->
                             Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)

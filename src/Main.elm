@@ -25,6 +25,7 @@ import Samples.Clock
 import Samples.Button
 import Samples.Images
 import Samples.API
+import Samples.UserProfile
 
 
 type EditMode
@@ -309,6 +310,7 @@ init flags location =
             , Samples.Button.source
             , Samples.Images.source
             , Samples.API.source
+            , Samples.UserProfile.source
             , "# Now your turn!"
             ]
                 |> Array.fromList
@@ -317,15 +319,7 @@ init flags location =
             parsePath route location
 
         model =
-            { documentSources =
-                [ Samples.Welcome.source
-                , Samples.Clock.source
-                , Samples.Button.source
-                , Samples.Images.source
-                , Samples.API.source
-                , "# Now your turn!"
-                ]
-                    |> Array.fromList
+            { documentSources = documentSources
             , parsedDocuments = Dict.empty
             , processedDocuments = Dict.empty
             , route = maybeRoute
