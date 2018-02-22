@@ -3,6 +3,7 @@ module Datadown
         ( Document
         , Section(..)
         , Content(..)
+        , ListItemQualifier (..)
         )
 
 {-| A library for Datadown parsing
@@ -18,14 +19,20 @@ import Dict exposing (Dict)
 import JsonValue exposing (JsonValue)
 
 
+type ListItemQualifier a
+    = Always
+    | Flag Bool
+    | Expression a
+
+
 {-| Content, such as plain text, code, lists, etc
 -}
 type Content a
     = Text String
-    | Code (Maybe String) String -- ```html
-    | Expressions a -- ```
-    | List (List (Content a)) -- -
-    | Quote (Document a) -- >
+    | Code (Maybe String) String -- ```html …
+    | Expressions a -- ``` …
+    | List (List (Content a, ListItemQualifier a)) -- | - … | - [x] … | - [ ] …
+    | Quote (Document a) -- > …
     | Json JsonValue
     | Reference String (List String)
 

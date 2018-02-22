@@ -205,10 +205,23 @@ processDocumentBlock parseExpressions block document =
                 contentAndExpressions =
                     List.map (List.filterMap (processContentBlock parseExpressions)) items
                         |> List.concat
+                
+                parseContentAndQualifier content =
+                    case content of
+                        Datadown.Text text ->
+                            if String.startsWith "[x] " text then
+                                ( Datadown.Text <| String.dropLeft 4 text, Datadown.Flag True )
+                            else if String.startsWith "[ ] " text then
+                                ( Datadown.Text <| String.dropLeft 4 text, Datadown.Flag False )
+                            else
+                                ( Datadown.Text text, Datadown.Always )
+                        
+                        _ ->
+                            ( content, Datadown.Always )
 
                 contentItems =
                     contentAndExpressions
-                        |> List.map .content
+                        |> List.map (.content >> parseContentAndQualifier)
 
                 expressions =
                     contentAndExpressions

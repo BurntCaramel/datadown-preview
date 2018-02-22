@@ -245,7 +245,7 @@ contentToJson model content =
 
         List items ->
             items
-                |> List.filterMap ((contentToJson model) >> Result.toMaybe)
+                |> List.filterMap (Tuple.first >> (contentToJson model) >> Result.toMaybe)
                 |> JsonValue.ArrayValue
                 |> Ok
 
@@ -722,7 +722,7 @@ viewContent options content =
                         [ code [ class "font-mono text-sm" ] (List.map viewExpression expressions) ]
 
         List items ->
-            ul [] (List.map (\item -> li [] [ viewContent options item ]) items)
+            ul [] (List.map (\( item, qualifier ) -> li [] [ viewContent options item ]) items)
 
         Quote document ->
             let

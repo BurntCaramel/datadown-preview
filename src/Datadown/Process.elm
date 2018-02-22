@@ -24,7 +24,7 @@ module Datadown.Process
 
 import Dict exposing (Dict(..))
 import Regex exposing (Regex)
-import Datadown exposing (Document, Section(..), Content(..))
+import Datadown exposing (Document, Section(..), Content(..), ListItemQualifier)
 import Datadown.Rpc as Rpc exposing (Rpc)
 import JsonValue exposing (JsonValue)
 import Json.Decode
@@ -322,7 +322,8 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         |> List.singleton
 
                                 Ok (List items) ->
-                                    List.map Ok items
+                                    items
+                                        |> List.map (Tuple.first >> Ok)
 
                                 _ ->
                                     if otherKeys == [] then
@@ -399,16 +400,31 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
 
                 List contentItems ->
                     let
-                        reduceItem : Content a -> Result (Error e) ( List (Content a), List Rpc ) -> Result (Error e) ( List (Content a), List Rpc )
-                        reduceItem item result =
+                        reduceItem : ( Content a, ListItemQualifier a ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List Rpc ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List Rpc )
+                        reduceItem ( item, qualifier ) result =
                             case result of
                                 Ok ( items, rpcs ) ->
-                                    case processContent item of
-                                        Ok ( processedItem, newRpcs ) ->
-                                            Ok ( processedItem :: items, newRpcs ++ rpcs )
+                                    let
+                                        skip =
+                                            case qualifier of
+                                                Datadown.Always ->
+                                                    False
+                                                
+                                                Datadown.Flag bool ->
+                                                    not bool
+                                                
+                                                Datadown.Expression expression ->
+                                                    True
+                                    in
+                                        if skip then
+                                            Ok ( items, rpcs )
+                                        else
+                                            case processContent item of
+                                                Ok ( processedItem, newRpcs ) ->
+                                                    Ok ( ( processedItem, Datadown.Always ) :: items, newRpcs ++ rpcs )
 
-                                        Err error ->
-                                            Err error
+                                                Err error ->
+                                                    Err error
 
                                 Err error ->
                                     Err error
