@@ -55,7 +55,7 @@ type Operator
     | EqualTo
     | LessThan Bool
     | GreaterThan Bool
-    | Math MathFunction
+    | MathModule MathFunction
     | HttpModule HttpFunction
 
 
@@ -63,6 +63,8 @@ type Url
     = Https String
     | Mailto String
     | Tel String
+    | Math String
+    | Time String
     | Other String String
 
 
@@ -132,6 +134,12 @@ schemeAndStringToUrl scheme string =
         "tel" ->
             Tel string
         
+        "math" ->
+            Math string
+        
+        "time" ->
+            Time string
+        
         _ ->
             Other scheme string
 
@@ -147,6 +155,12 @@ urlToString url =
         
         Tel phone ->
             "tel:" ++ phone
+        
+        Math string ->
+            "math:" ++ string
+        
+        Time string ->
+            "time:" ++ string
         
         Other scheme string ->
             scheme ++ ":" ++ string
@@ -189,13 +203,13 @@ operator =
             |. symbol ">="
         , succeed (GreaterThan False)
             |. symbol ">"
-        , succeed (Math Sine)
+        , succeed (MathModule Sine)
             |. keyword "Math.sin"
-        , succeed (Math Cosine)
+        , succeed (MathModule Cosine)
             |. keyword "Math.cos"
-        , succeed (Math Tangent)
+        , succeed (MathModule Tangent)
             |. keyword "Math.tan"
-        , succeed (Math Turns)
+        , succeed (MathModule Turns)
             |. keyword "Math.turns"
         , succeed (HttpModule GetJson)
             |. keyword "HTTP.get_json"

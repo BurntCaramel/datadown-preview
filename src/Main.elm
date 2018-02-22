@@ -116,7 +116,7 @@ parseExpressions input =
 builtInValueFromModel : Model -> String -> Maybe JsonValue
 builtInValueFromModel model key =
     case key of
-        "now.seconds" ->
+        "time:seconds" ->
             model.now
                 |> Time.inSeconds
                 |> floor

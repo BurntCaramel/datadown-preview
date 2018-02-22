@@ -11,30 +11,30 @@ source =
 
 ## seconds
 ```
-now.seconds / 60
+time:seconds / 60
 ```
 
 ## pi_1_5
 ```
-1.5 * Math.pi
+1.5 * math:pi
 ```
 
 ## angle
 ```
-Math.turns seconds
+math:turns seconds
 + pi_1_5
 ```
 
 ## handX
 ```
-Math.cos angle
+math:cos angle
 * 38
 + 50
 ```
 
 ## handY
 ```
-Math.sin angle
+math:sin angle
 * 38
 + 50
 ```

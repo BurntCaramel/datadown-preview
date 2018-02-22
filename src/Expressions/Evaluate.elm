@@ -164,7 +164,7 @@ processOperator op a b =
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
-        Math function ->
+        MathModule function ->
             case ( toFloat a, toFloat b ) of
                 ( Just a, Just b ) ->
                     Ok <|
@@ -214,6 +214,26 @@ requireValue resolveIdentifier token =
 
                 Err e ->
                     Err (NoValueForIdentifier identifier)
+        
+        Url (Math string) ->
+            case string of
+                "pi" ->
+                    Ok <| NumericValue pi
+                
+                "e" ->
+                    Ok <| NumericValue e
+                
+                _ ->
+                    Err NotValue
+                        |> Debug.log (toString string)
+        
+        Url (Time string) ->
+            case resolveIdentifier ("time:" ++ string) of
+                Ok v ->
+                    Ok v
+
+                Err e ->
+                    Err (NoValueForIdentifier ("time:" ++ string))
 
         _ ->
             Err NotValue
@@ -249,6 +269,42 @@ evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
         Url (Https urlTail) :: [] ->
             Ok <| rpcJsonForHttpGet ("https:" ++ urlTail)
+        
+        Url (Math "turns") :: a1 :: [] ->
+            requireValue resolveIdentifier a1
+                |> Result.andThen (processOperator (MathModule Turns) (previousValue |> Maybe.withDefault (NumericValue 1)))
+        
+        Url (Math "cos") :: a1 :: [] ->
+            requireValue resolveIdentifier a1
+                |> Result.andThen (processOperator (MathModule Cosine) (previousValue |> Maybe.withDefault (NumericValue 1)))
+
+        Url (Math "sin") :: a1 :: [] ->
+            requireValue resolveIdentifier a1
+                |> Result.andThen (processOperator (MathModule Sine) (previousValue |> Maybe.withDefault (NumericValue 1)))
+        
+        Url (Math "tan") :: a1 :: [] ->
+            requireValue resolveIdentifier a1
+                |> Result.andThen (processOperator (MathModule Tangent) (previousValue |> Maybe.withDefault (NumericValue 1)))
+        
+        Operator operator :: tl ->
+            let
+                start : Result Error JsonValue
+                start =
+                    case previousValue of
+                        Just v ->
+                            Ok v
+
+                        Nothing ->
+                            identityForOperator operator
+                                |> Result.fromMaybe NoInput
+
+                values : Result Error (List JsonValue)
+                values =
+                    requireValueList resolveIdentifier tl
+            in
+                -- Support e.g. * 5 5 5 == 125
+                Result.map2 (,) start values
+                    |> Result.andThen (uncurry <| valueOperatorOnList operator)
 
         hd :: tl ->
             case requireValue resolveIdentifier hd of
@@ -256,29 +312,7 @@ evaluateTokens resolveIdentifier previousValue tokens =
                     processValueExpression value resolveIdentifier tl
 
                 Err error ->
-                    case hd of
-                        Operator operator ->
-                            let
-                                start : Result Error JsonValue
-                                start =
-                                    case previousValue of
-                                        Just v ->
-                                            Ok v
-
-                                        Nothing ->
-                                            identityForOperator operator
-                                                |> Result.fromMaybe NoInput
-
-                                values : Result Error (List JsonValue)
-                                values =
-                                    requireValueList resolveIdentifier tl
-                            in
-                                -- Support e.g. * 5 5 5 == 125
-                                Result.map2 (,) start values
-                                    |> Result.andThen (uncurry <| valueOperatorOnList operator)
-
-                        _ ->
-                            Err error
+                    Err error
 
         [] ->
             Err NoInput
