@@ -555,12 +555,33 @@ update msg model =
 
                         Nothing ->
                             []
+                
+                rpcToCommandAndId rpc =
+                    case Datadown.Rpc.toCommand RpcResponded rpc of
+                        Just command ->
+                            Just ( rpc.id, command )
+                        
+                        Nothing ->
+                            Nothing
 
-                commands =
+                ( ids, commands ) =
                     rpcs
-                        |> List.filterMap (Datadown.Rpc.toCommand RpcResponded)
+                        |> List.filterMap rpcToCommandAndId
+                        |> List.unzip
+                
+                emptyResponses =
+                    List.repeat (List.length ids) Nothing
+                        |> List.map2 (,) ids
+                        |> Dict.fromList
+                
+                rpcResponses =
+                    model.rpcResponses
+                        |> Dict.union emptyResponses
+                
+                newModel =
+                    modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses }
             in
-                model ! commands
+                newModel ! commands
         
         BeginRpcWithID id reload ->
             let
@@ -596,7 +617,11 @@ update msg model =
                     Just rpc ->
                         case Datadown.Rpc.toCommand RpcResponded rpc of
                             Just command ->
-                                model ! [ command ]
+                                let
+                                    rpcResponses =
+                                        Dict.insert id Nothing model.rpcResponses
+                                in
+                                    modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! [ command ]
                             
                             Nothing ->
                                 model ! []
