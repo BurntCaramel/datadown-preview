@@ -298,7 +298,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                         Ok (Json json) ->
                             case Rpc.fromJsonValue json of
                                 Just rpc ->
-                                    Just (Reference rpc.id otherKeys)
+                                    Just (Reference rpc.id otherKeys json)
 
                                 Nothing ->
                                     Nothing

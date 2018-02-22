@@ -192,27 +192,32 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
                 evaluateTokenLines resolveWithModel expressions
 
 
-valueForRpcID : Model -> String -> List String -> Result Evaluate.Error JsonValue
-valueForRpcID model id keyPath =
+valueForRpcID : Model -> String -> List String -> JsonValue -> Result Evaluate.Error JsonValue
+valueForRpcID model id keyPath json =
     let
         maybeMaybeResponse =
             Dict.get id model.rpcResponses
     in
-        case maybeMaybeResponse of
-            Nothing ->
-                Ok (JsonValue.NullValue)
-
-            Just Nothing ->
-                Ok (JsonValue.NullValue)
-
-            Just (Just response) ->
-                case keyPath of
-                    "result" :: otherKeys ->
+        case keyPath of
+            "params" :: otherKeys ->
+                json
+                    |> JsonValue.getIn keyPath
+                    >> Result.mapError Evaluate.NoValueForIdentifier
+                    |> Debug.log "params"
+            
+            "result" :: otherKeys ->
+                case maybeMaybeResponse of
+                    Just (Just response) ->
                         response.result
                             |> Result.mapError Evaluate.Rpc
                             |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
-
-                    "error" :: otherKeys ->
+                    
+                    _ ->
+                        Ok (JsonValue.NullValue)
+            
+            "error" :: otherKeys ->
+                case maybeMaybeResponse of
+                    Just (Just response) ->
                         case response.result of
                             Err error ->
                                 error
@@ -222,9 +227,12 @@ valueForRpcID model id keyPath =
 
                             _ ->
                                 Ok (JsonValue.NullValue)
-
+                    
                     _ ->
-                        Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
+                        Ok (JsonValue.NullValue)
+
+            _ ->
+                Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
 
 
 contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
@@ -253,8 +261,8 @@ contentToJson model content =
         Code maybeLanguage source ->
             Ok <| JsonValue.StringValue <| String.trim source
 
-        Reference id keyPath ->
-            valueForRpcID model id keyPath
+        Reference id keyPath json ->
+            valueForRpcID model id keyPath json
 
         _ ->
             Err Evaluate.CannotConvertToJson
@@ -802,8 +810,8 @@ viewContent options content =
                     |> List.map (viewSection [] options)
                     |> div [ class "pl-6 border-l border-teal" ]
 
-        Reference id keyPath ->
-            div [] [ text "Reference: ", text <| toString id ]
+        Reference id keyPath json ->
+            div [] [ text "Reference: ", cite [] [ text <| toString id ] ]
 
 
 viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message

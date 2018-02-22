@@ -34,7 +34,7 @@ type Content a
     | List (List (Content a, ListItemQualifier a)) -- | - … | - [x] … | - [ ] …
     | Quote (Document a) -- > …
     | Json JsonValue
-    | Reference String (List String)
+    | Reference String (List String) JsonValue
 
 
 {-| A section of data
