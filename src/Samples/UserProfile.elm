@@ -5,12 +5,9 @@ source : String
 source =
     """# User Profile
 
-## profile_data_url
-https://randomuser.me/api
-
 ## profile_data
 ```
-HTTP.get_json profile_data_url
+https://randomuser.me/api
 ```
 
 ## blah

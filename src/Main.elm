@@ -186,7 +186,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
     in
         case parsedExpressions of
             Err error ->
-                Err Evaluate.Parsing
+                Err <| Evaluate.Parsing (toString error)
 
             Ok expressions ->
                 evaluateTokenLines resolveWithModel expressions
@@ -597,6 +597,9 @@ viewExpressionToken token =
 
         Operator operator ->
             div [] [ text (toString operator) ]
+        
+        Url url ->
+            div [] [ text (toString url) ]
 
 
 viewExpression : List Token -> Html Message

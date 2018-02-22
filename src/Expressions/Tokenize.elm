@@ -8,8 +8,10 @@ module Expressions.Tokenize
         , tokenize
         , Token(..)
         , Operator(..)
+        , Url(..)
         , MathFunction(..)
         , HttpFunction(..)
+        , urlToString
         )
 
 {-| Tokenize
@@ -29,7 +31,7 @@ module Expressions.Tokenize
 import Parser exposing (..)
 import Parser.LanguageKit exposing (variable)
 import Char
-import Set
+import Set exposing (Set)
 import JsonValue exposing (JsonValue(..))
 
 
@@ -54,13 +56,21 @@ type Operator
     | LessThan Bool
     | GreaterThan Bool
     | Math MathFunction
-    | Http HttpFunction
+    | HttpModule HttpFunction
+
+
+type Url
+    = Https String
+    | Mailto String
+    | Tel String
+    | Other String String
 
 
 type Token
     = Identifier String
     | Value JsonValue
     | Operator Operator
+    | Url Url
 
 
 
@@ -98,10 +108,62 @@ isIdentifierTailChar c =
         == '_'
 
 
+notIdentifiers : Set String
+notIdentifiers =
+    ["true", "false"]
+        |> Set.fromList
+
+
 identifier : Parser Token
 identifier =
-    variable isIdentifierHeadChar isIdentifierTailChar Set.empty
+    variable isIdentifierHeadChar isIdentifierTailChar notIdentifiers
         |> map Identifier
+
+
+schemeAndStringToUrl : String -> String -> Url
+schemeAndStringToUrl scheme string =
+    case scheme of
+        "https" ->
+            Https string
+        
+        "mailto" ->
+            Mailto string
+        
+        "tel" ->
+            Tel string
+        
+        _ ->
+            Other scheme string
+
+
+urlToString : Url -> String
+urlToString url =
+    case url of
+        Https string ->
+            "https:" ++ string
+        
+        Mailto email ->
+            "mailto:" ++ email
+        
+        Tel phone ->
+            "tel:" ++ phone
+        
+        Other scheme string ->
+            scheme ++ ":" ++ string
+
+
+whitespaceChars : Set Char
+whitespaceChars =
+    [' ', '\n', '\r', '\t']
+        |> Set.fromList
+
+
+url : Parser Token
+url =
+    delayedCommitMap schemeAndStringToUrl
+        (keep oneOrMore Char.isLower |. symbol ":")
+        (keep oneOrMore (\c -> Set.member c whitespaceChars |> not))
+        |> map Url
 
 
 operator : Parser Operator
@@ -135,7 +197,7 @@ operator =
             |. keyword "Math.tan"
         , succeed (Math Turns)
             |. keyword "Math.turns"
-        , succeed (Http GetJson)
+        , succeed (HttpModule GetJson)
             |. keyword "HTTP.get_json"
         ]
 
@@ -172,6 +234,7 @@ token =
         oneOf
             [ succeed Value
                 |= magicNumbers
+            , url
             , identifier
             , succeed Value
                 |= value

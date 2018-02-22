@@ -4,14 +4,14 @@ module Expressions.Evaluate
         , Error(..)
         )
 
-import Expressions.Tokenize exposing (Operator(..), Token(..), MathFunction(..), HttpFunction(..))
+import Expressions.Tokenize exposing (Operator(..), Token(..), Url(..), MathFunction(..), HttpFunction(..), urlToString)
 import JsonValue exposing (JsonValue(..))
 import Datadown.Rpc
 
 
 type Error
     = InvalidNumberExpression
-    | Parsing
+    | Parsing String
     | NoInput
     | NotValue
     | NoValueForIdentifier String
@@ -68,8 +68,8 @@ useString value =
             Nothing
 
 
-makeRpcJson : String -> Maybe JsonValue -> JsonValue -> JsonValue
-makeRpcJson method maybeParams id =
+rpcJson : String -> Maybe JsonValue -> JsonValue -> JsonValue
+rpcJson method maybeParams id =
     [ Just ( "jsonrpc", StringValue "2.0" )
     , Just ( "method", StringValue method )
     , Maybe.map ((,) "params") maybeParams
@@ -77,6 +77,19 @@ makeRpcJson method maybeParams id =
     ]
         |> List.filterMap identity
         |> ObjectValue
+
+
+rpcJsonForHttpGet : String -> JsonValue
+rpcJsonForHttpGet url =
+    rpcJson "HTTP"
+        (Just <|
+            ObjectValue
+                [ ( "method", StringValue "GET" )
+                , ( "type", StringValue "JSON" )
+                , ( "url", StringValue url )
+                ]
+        )
+        (StringValue <| "GET json " ++ url)
 
 
 processOperator : Operator -> JsonValue -> JsonValue -> Result Error JsonValue
@@ -172,20 +185,12 @@ processOperator op a b =
                 _ ->
                     Err <| InvalidValuesForOperator op a b
 
-        Http function ->
+        HttpModule function ->
             case function of
                 GetJson ->
                     case useString b of
                         Just url ->
-                            Ok <|
-                                makeRpcJson "HTTP"
-                                    (Just <|
-                                        ObjectValue
-                                            [ ( "method", StringValue "GET" )
-                                            , ( "url", StringValue url )
-                                            ]
-                                    )
-                                    (StringValue <| "GET json " ++ url)
+                            Ok <| rpcJsonForHttpGet url
 
                         _ ->
                             Err <| InvalidValuesForOperator op a b
@@ -242,6 +247,9 @@ processValueExpression left resolveIdentifier tokens =
 evaluateTokens : (String -> Result e JsonValue) -> Maybe JsonValue -> List Token -> Result Error JsonValue
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
+        Url (Https urlTail) :: [] ->
+            Ok <| rpcJsonForHttpGet ("https:" ++ urlTail)
+
         hd :: tl ->
             case requireValue resolveIdentifier hd of
                 Ok value ->
