@@ -5,12 +5,12 @@ source : String
 source =
     """# Loading from APIs
 
-## post_url
-<https://jsonplaceholder.typicode.com/posts/3>
+## post_index
+3
 
 ## post
 ```
-HTTP.get_json post_url
+https://jsonplaceholder.typicode.com/posts post_index
 ```
 
 ## view

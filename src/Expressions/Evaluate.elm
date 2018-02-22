@@ -16,6 +16,7 @@ type Error
     | NotValue
     | NoValueForIdentifier String
     | Unknown
+    | CannotJoinUrl String
     | InvalidValuesForOperator Operator JsonValue JsonValue
     | CannotConvertToJson
     | Rpc Datadown.Rpc.Error
@@ -201,6 +202,31 @@ valueOperatorOnList op a rest =
     List.foldl ((processOperator op |> flip) >> Result.andThen) (Ok a) rest
 
 
+urlWithPathsList : String -> List JsonValue -> Result Error String
+urlWithPathsList prefix pathValues =
+    case pathValues of
+        [] ->
+            Ok prefix
+        
+        hd :: tl ->
+            case useString hd of
+                Just string ->
+                    let
+                        newPrefix =
+                            case String.right 1 prefix of
+                                "/" ->
+                                    prefix ++ string
+                                
+                                _ ->
+                                    prefix ++ "/" ++ string
+                    in
+                        urlWithPathsList newPrefix tl
+
+                Nothing ->
+                    Err <| CannotJoinUrl prefix
+
+
+
 requireValue : (String -> Result e JsonValue) -> Token -> Result Error JsonValue
 requireValue resolveIdentifier token =
     case token of
@@ -267,8 +293,10 @@ processValueExpression left resolveIdentifier tokens =
 evaluateTokens : (String -> Result e JsonValue) -> Maybe JsonValue -> List Token -> Result Error JsonValue
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
-        Url (Https urlTail) :: [] ->
-            Ok <| rpcJsonForHttpGet ("https:" ++ urlTail)
+        Url (Https baseString) :: tl ->
+            requireValueList resolveIdentifier tl
+                |> Result.andThen (urlWithPathsList ("https:" ++ baseString))
+                |> Result.map rpcJsonForHttpGet
         
         Url (Math "turns") :: a1 :: [] ->
             requireValue resolveIdentifier a1

@@ -10,7 +10,7 @@ source =
 https://randomuser.me/api
 ```
 
-## blah
+## view
 ```html
 <Row>
 {{#profile_data.result.results.0}}
