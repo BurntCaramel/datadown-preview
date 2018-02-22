@@ -203,7 +203,7 @@ valueForRpcID model id keyPath =
                 Ok (JsonValue.NullValue)
 
             Just Nothing ->
-                Ok (JsonValue.StringValue "Loading…")
+                Ok (JsonValue.NullValue)
 
             Just (Just response) ->
                 case keyPath of
