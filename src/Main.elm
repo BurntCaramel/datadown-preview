@@ -849,7 +849,7 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "fixed w-full h-8 bg-indigo-darkest", class "bg-red" ]
+    div [ class "fixed z-50 w-full h-8 bg-indigo-darkest", class "bg-red" ]
         [ case model.route of
             Just DocumentsList ->
                 div [ row, class "px-2 h-8 justify-between" ]
