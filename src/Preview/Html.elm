@@ -30,7 +30,25 @@ isSafeElement tagName attributes children =
     not (List.member tagName unsafeTagNames)
 
 
-{-| Previews a HTML string as santized HTML
+keepIfSafeNode : HtmlParser.Node -> Maybe HtmlParser.Node
+keepIfSafeNode node =
+    case node of
+        HtmlParser.Element tagName attrs children ->
+            if isSafeElement tagName attrs children then
+                Just <| HtmlParser.Element tagName attrs (sanitizeNodes children)
+            else
+                Nothing
+
+        _ ->
+            Just node
+
+
+sanitizeNodes : List HtmlParser.Node -> List HtmlParser.Node
+sanitizeNodes =
+    List.filterMap keepIfSafeNode
+
+
+{-| Previews a HTML string as sanitized HTML
 -}
 view : Bool -> String -> Html msg
 view isSVG source =
@@ -38,7 +56,7 @@ view isSVG source =
         elements =
             source
                 |> HtmlParser.parse
-                |> HtmlParser.Util.filterElements isSafeElement
+                |> sanitizeNodes
 
         hasSurroundingSVGTag =
             case List.head elements of
