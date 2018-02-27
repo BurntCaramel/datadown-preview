@@ -30,5 +30,8 @@ module.exports = {
       ],
       "flexbox": "no-2009"
     }
+  },
+  devServer: {
+    port: 8800
   }
 }
