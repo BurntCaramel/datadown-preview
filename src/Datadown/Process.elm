@@ -332,19 +332,24 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         [ Err (NoValueForKeyPath keyPath) ]
 
                 findContentInSection : ( String, ResolvedSection (Error e) a ) -> Maybe (List (Result (Error e) (Content a)))
-                findContentInSection ( key, resolvedSection ) =
+                findContentInSection ( fullKey, resolvedSection ) =
                     case resolvedSection of
                         ResolvedSection record ->
-                            if key == firstKey then
-                                case record.mainContent of
-                                    [] ->
-                                        otherKeys
-                                            |> contentForKeyPathInResolvedSections record.subsections
+                            case String.split ":" fullKey of
+                                baseKey :: kind :: [] ->
+                                    if baseKey == firstKey then
+                                        case record.mainContent of
+                                            [] ->
+                                                otherKeys
+                                                    |> contentForKeyPathInResolvedSections record.subsections
 
-                                    _ ->
-                                        Just (List.concatMap resolveContentResult record.mainContent)
-                            else
-                                Nothing
+                                            _ ->
+                                                Just (List.concatMap resolveContentResult record.mainContent)
+                                    else
+                                        Nothing
+                                
+                                _ ->
+                                    Nothing
 
                 findInSections resolvedSections =
                     case resolvedSections of
