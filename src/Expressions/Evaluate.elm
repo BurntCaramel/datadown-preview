@@ -207,7 +207,7 @@ urlWithPathsList prefix pathValues =
     case pathValues of
         [] ->
             Ok prefix
-        
+
         hd :: tl ->
             case useString hd of
                 Just string ->
@@ -216,7 +216,7 @@ urlWithPathsList prefix pathValues =
                             case String.right 1 prefix of
                                 "/" ->
                                     prefix ++ string
-                                
+
                                 _ ->
                                     prefix ++ "/" ++ string
                     in
@@ -224,7 +224,6 @@ urlWithPathsList prefix pathValues =
 
                 Nothing ->
                     Err <| CannotJoinUrl prefix
-
 
 
 requireValue : (String -> Result e JsonValue) -> Token -> Result Error JsonValue
@@ -240,19 +239,19 @@ requireValue resolveIdentifier token =
 
                 Err e ->
                     Err (NoValueForIdentifier identifier)
-        
+
         Url (Math string) ->
             case string of
                 "pi" ->
                     Ok <| NumericValue pi
-                
+
                 "e" ->
                     Ok <| NumericValue e
-                
+
                 _ ->
                     Err NotValue
                         |> Debug.log (toString string)
-        
+
         Url (Time string) ->
             case resolveIdentifier ("time:" ++ string) of
                 Ok v ->
@@ -293,28 +292,28 @@ processValueExpression left resolveIdentifier tokens =
 evaluateTokens : (String -> Result e JsonValue) -> Maybe JsonValue -> List Token -> Result Error JsonValue
 evaluateTokens resolveIdentifier previousValue tokens =
     case tokens of
-        Url (Https baseString) :: tl ->
+        (Url (Https baseString)) :: tl ->
             requireValueList resolveIdentifier tl
                 |> Result.andThen (urlWithPathsList ("https:" ++ baseString))
                 |> Result.map rpcJsonForHttpGet
-        
-        Url (Math "turns") :: a1 :: [] ->
+
+        (Url (Math "turns")) :: a1 :: [] ->
             requireValue resolveIdentifier a1
                 |> Result.andThen (processOperator (MathModule Turns) (previousValue |> Maybe.withDefault (NumericValue 1)))
-        
-        Url (Math "cos") :: a1 :: [] ->
+
+        (Url (Math "cos")) :: a1 :: [] ->
             requireValue resolveIdentifier a1
                 |> Result.andThen (processOperator (MathModule Cosine) (previousValue |> Maybe.withDefault (NumericValue 1)))
 
-        Url (Math "sin") :: a1 :: [] ->
+        (Url (Math "sin")) :: a1 :: [] ->
             requireValue resolveIdentifier a1
                 |> Result.andThen (processOperator (MathModule Sine) (previousValue |> Maybe.withDefault (NumericValue 1)))
-        
-        Url (Math "tan") :: a1 :: [] ->
+
+        (Url (Math "tan")) :: a1 :: [] ->
             requireValue resolveIdentifier a1
                 |> Result.andThen (processOperator (MathModule Tangent) (previousValue |> Maybe.withDefault (NumericValue 1)))
-        
-        Operator operator :: tl ->
+
+        (Operator operator) :: tl ->
             let
                 start : Result Error JsonValue
                 start =

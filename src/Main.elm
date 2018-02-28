@@ -9,6 +9,9 @@ import Time exposing (Time)
 import Date
 import Array exposing (Array)
 import Dict exposing (Dict)
+import Task
+import Http
+import Routes exposing (Route(..), CollectionSource(..), EditMode(..))
 import Datadown exposing (Document, Section(..), Content(..))
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
@@ -26,51 +29,7 @@ import Samples.Button
 import Samples.Images
 import Samples.API
 import Samples.UserProfile
-
-
-type EditMode
-    = Off
-    | WithPreview
-    | Only
-
-
-editModeDict : Dict String EditMode
-editModeDict =
-    Dict.fromList
-        [ ( "0", Off )
-        , ( "1", WithPreview )
-        , ( "2", Only )
-        ]
-
-
-editModeFromString : Maybe String -> EditMode
-editModeFromString maybeString =
-    maybeString
-        |> Maybe.andThen (\s -> Dict.get s editModeDict)
-        |> Maybe.withDefault WithPreview
-
-
-type Route
-    = DocumentsList
-    | Document Int EditMode
-
-
-route : UrlParser.Parser (Route -> a) a
-route =
-    let
-        intFrom1 =
-            UrlParser.map (\i -> i - 1) int
-    in
-        
-    oneOf
-        [ UrlParser.map DocumentsList (UrlParser.s "example")
-        , let
-            editMode =
-                UrlParser.customParam "editMode" editModeFromString
-        in
-            UrlParser.map Document
-                (UrlParser.s "example" </> intFrom1 <?> editMode)
-        ]
+import Services.GitHub
 
 
 type alias Expressions =
@@ -78,13 +37,14 @@ type alias Expressions =
 
 
 type alias Model =
-    { documentSources : Array String
-    , parsedDocuments : Dict Int (Document Expressions)
-    , processedDocuments : Dict Int (Resolved Evaluate.Error Expressions)
-    , route : Maybe Route
+    { documentSources : Dict String String
+    , parsedDocuments : Dict String (Document Expressions)
+    , processedDocuments : Dict String (Resolved Evaluate.Error Expressions)
+    , route : Route
     , now : Time
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
+    , gitHubContents : Dict ( String, String ) (List Services.GitHub.ContentInfo)
     }
 
 
@@ -203,18 +163,17 @@ valueForRpcID model id keyPath json =
                 json
                     |> JsonValue.getIn keyPath
                     >> Result.mapError Evaluate.NoValueForIdentifier
-                    |> Debug.log "params"
-            
+
             "result" :: otherKeys ->
                 case maybeMaybeResponse of
                     Just (Just response) ->
                         response.result
                             |> Result.mapError Evaluate.Rpc
                             |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
-                    
+
                     _ ->
                         Ok (JsonValue.NullValue)
-            
+
             "error" :: otherKeys ->
                 case maybeMaybeResponse of
                     Just (Just response) ->
@@ -227,7 +186,7 @@ valueForRpcID model id keyPath json =
 
                             _ ->
                                 Ok (JsonValue.NullValue)
-                    
+
                     _ ->
                         Ok (JsonValue.NullValue)
 
@@ -269,13 +228,12 @@ contentToJson model content =
 
 
 type alias Flags =
-    {
-    }
+    {}
 
 
-modelWithDocumentProcessed : Int -> Model -> Model
-modelWithDocumentProcessed index model =
-    case Array.get index model.documentSources of
+modelWithDocumentProcessed : String -> Model -> Model
+modelWithDocumentProcessed key model =
+    case Dict.get key model.documentSources of
         Just source ->
             let
                 parsed =
@@ -285,10 +243,10 @@ modelWithDocumentProcessed index model =
                     processDocumentWithModel model parsed
 
                 parsedDocuments =
-                    Dict.insert index parsed model.parsedDocuments
+                    Dict.insert key parsed model.parsedDocuments
 
                 processedDocuments =
-                    Dict.insert index processed model.processedDocuments
+                    Dict.insert key processed model.processedDocuments
             in
                 { model
                     | parsedDocuments = parsedDocuments
@@ -302,8 +260,8 @@ modelWithDocumentProcessed index model =
 modelWithCurrentDocumentProcessed : Model -> Model
 modelWithCurrentDocumentProcessed model =
     case model.route of
-        Just (Document index _) ->
-            modelWithDocumentProcessed index model
+        CollectionItem source key _ ->
+            modelWithDocumentProcessed key model
 
         _ ->
             model
@@ -313,37 +271,57 @@ init : Flags -> Location -> ( Model, Cmd Message )
 init flags location =
     let
         documentSources =
-            [ Samples.Welcome.source
-            , Samples.Clock.source
-            , Samples.Button.source
-            , Samples.Images.source
-            , Samples.API.source
-            , Samples.UserProfile.source
-            , "# Now your turn!"
+            [ ( "welcome", Samples.Welcome.source )
+            , ( "clock", Samples.Clock.source )
+            , ( "button", Samples.Button.source )
+            , ( "images", Samples.Images.source )
+            , ( "api", Samples.API.source )
+            , ( "user-profile", Samples.UserProfile.source )
+            , ( "try", "# Now your turn!" )
             ]
-                |> Array.fromList
-        
-        maybeRoute =
-            parsePath route location
+                |> Dict.fromList
+
+        route =
+            Routes.parseLocation location
 
         model =
             { documentSources = documentSources
             , parsedDocuments = Dict.empty
             , processedDocuments = Dict.empty
-            , route = maybeRoute
+            , route = route
             , now = 0
             , sectionInputs = Dict.empty
             , rpcResponses = Dict.empty
+            , gitHubContents = Dict.empty
             }
+
+        maybeCollection =
+            case route of
+                Collection collection ->
+                    Just collection
+                
+                CollectionItem collection _ _ ->
+                    Just collection
+                
+                _ ->
+                    Nothing
+        
+        commands =
+            case maybeCollection of
+                Just (GitHubRepo owner repo branch) ->
+                    [ Services.GitHub.listDocuments owner repo
+                        |> Task.attempt (LoadedGitHubComponents owner repo)
+                    ]
+                
+                _ ->
+                    []
     in
-        (case maybeRoute of
-            Just (Document index _) ->
-                modelWithDocumentProcessed index model
+        case route of
+            CollectionItem source key _ ->
+                modelWithDocumentProcessed key model ! commands
 
             _ ->
-                model
-        )
-            ! []
+                model ! commands
 
 
 type Message
@@ -352,13 +330,14 @@ type Message
     | GoToDocumentsList
     | GoToPreviousDocument
     | GoToNextDocument
-    | GoToDocumentAtIndex Int
+    | GoToDocumentWithKey CollectionSource String
     | NewDocument
     | ChangeSectionInput String String
     | Time Time
     | BeginLoading
     | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
+    | LoadedGitHubComponents String String (Result Http.Error (List Services.GitHub.ContentInfo))
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -371,14 +350,14 @@ update msg model =
             let
                 newModel =
                     case model.route of
-                        Just (Document index _) ->
+                        CollectionItem source key _ ->
                             let
                                 documentSources =
                                     model.documentSources
-                                        |> Array.set index newInput
+                                        |> Dict.insert key newInput
                             in
                                 { model | documentSources = documentSources }
-                                    |> modelWithDocumentProcessed index
+                                    |> modelWithDocumentProcessed key
 
                         _ ->
                             model
@@ -386,60 +365,99 @@ update msg model =
                 newModel ! []
 
         GoToDocumentsList ->
-            { model | route = Just DocumentsList } ! [ Navigation.modifyUrl "/example" ]
+            let
+                route =
+                    case model.route of
+                        Collection collection ->
+                            Collection collection
+
+                        CollectionItem collection _ _ ->
+                            Collection collection
+
+                        _ ->
+                            Landing
+            in
+                { model | route = route } ! [ Navigation.modifyUrl <| Routes.toPath route ]
 
         GoToPreviousDocument ->
             case model.route of
-                Just (Document index editMode) ->
-                    let
-                        newIndex =
-                            max 0 (index - 1)
-                        
-                        newRoute =
-                            Just (Document newIndex editMode)
-                        
-                        newModel =
-                            { model | route = newRoute }
-                                |> modelWithDocumentProcessed newIndex
-                    in
-                        newModel ! [ Navigation.modifyUrl ("/example/" ++ toString (newIndex + 1)) ]
-                
+                CollectionItem collection key editMode ->
+                    case String.toInt key of
+                        Ok index ->
+                            let
+                                newIndex =
+                                    max 0 (index - 1)
+                                
+                                newKey =
+                                    toString newIndex
+
+                                newRoute =
+                                    CollectionItem collection newKey editMode
+
+                                newModel =
+                                    { model | route = newRoute }
+                                        |> modelWithDocumentProcessed newKey
+                            in
+                                newModel ! [ Navigation.modifyUrl <| Routes.toPath newRoute ]
+
+                        _ ->
+                            model ! []
+
                 _ ->
                     model ! []
 
         GoToNextDocument ->
             case model.route of
-                Just (Document index editMode) ->
-                    let
-                        maxIndex =
-                            Array.length model.documentSources - 1
+                CollectionItem collection key editMode ->
+                    case String.toInt key of
+                        Ok index ->
+                            let
+                                maxIndex =
+                                    Dict.size model.documentSources - 1
 
-                        newIndex =
-                            min maxIndex (index + 1)
-                        
-                        newModel =
-                            { model | route = Just <| Document newIndex WithPreview }
-                                |> modelWithDocumentProcessed newIndex
-                    in
-                        newModel ! [ Navigation.modifyUrl ("/example/" ++ toString (newIndex + 1)) ]
-                
+                                newIndex =
+                                    min maxIndex (index + 1)
+                                
+                                newKey =
+                                    toString newIndex
+
+                                newRoute =
+                                    CollectionItem collection newKey editMode
+
+                                newModel =
+                                    { model | route = newRoute }
+                                        |> modelWithDocumentProcessed newKey
+                            in
+                                newModel ! [ Navigation.modifyUrl <| Routes.toPath newRoute ]
+
+                        _ ->
+                            model ! []
+
                 _ ->
                     model ! []
 
-        GoToDocumentAtIndex newIndex ->
+        GoToDocumentWithKey collection key ->
             let
+                newRoute =
+                    CollectionItem collection key WithPreview
+
                 newModel =
-                    { model | route = Just <| Document newIndex WithPreview }
-                        |> modelWithDocumentProcessed newIndex
+                    { model | route = newRoute }
+                        |> modelWithDocumentProcessed key
             in
-                newModel ! [ Navigation.modifyUrl ("/example/" ++ toString (newIndex + 1)) ]
+                newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
 
         NewDocument ->
             let
                 currentIndex =
                     case model.route of
-                        Just (Document index _) ->
-                            index
+                        CollectionItem collection key editMode ->
+                            case String.toInt key of
+                                Ok index ->
+                                    index
+
+                                _ ->
+                                    0
 
                         _ ->
                             0
@@ -447,17 +465,9 @@ update msg model =
                 newDocumentSource =
                     "# Untitled"
 
-                prefix =
-                    model.documentSources
-                        |> Array.slice 0 currentIndex
-                        |> Array.push newDocumentSource
-
-                suffix =
-                    model.documentSources
-                        |> Array.slice currentIndex (Array.length model.documentSources)
-
                 documentSources =
-                    Array.append prefix suffix
+                    model.documentSources
+                        |> Dict.insert "new" newDocumentSource
             in
                 { model
                     | documentSources = documentSources
@@ -475,14 +485,6 @@ update msg model =
                     model.sectionInputs
                         |> Dict.insert sectionTitle newValue
 
-                maybeIndex =
-                    case model.route of
-                        Just (Document index _) ->
-                            Just index
-
-                        _ ->
-                            Nothing
-
                 newModel =
                     { model | sectionInputs = newSectionInputs }
             in
@@ -492,18 +494,18 @@ update msg model =
             let
                 newModel =
                     case model.route of
-                        Just (Document index _) ->
+                        CollectionItem collection key _ ->
                             let
                                 modelWithTime =
                                     { model | now = time }
 
                                 maybeParsed =
-                                    case Dict.get index model.parsedDocuments of
+                                    case Dict.get key model.parsedDocuments of
                                         Just parsed ->
                                             Just ( True, parsed )
 
                                         Nothing ->
-                                            case Array.get index model.documentSources of
+                                            case Dict.get key model.documentSources of
                                                 Just source ->
                                                     Just ( False, parseDocument parseExpressions source )
 
@@ -520,10 +522,10 @@ update msg model =
                                                 if cached then
                                                     model.parsedDocuments
                                                 else
-                                                    Dict.insert index parsed model.parsedDocuments
+                                                    Dict.insert key parsed model.parsedDocuments
 
                                             processedDocuments =
-                                                Dict.insert index processed model.processedDocuments
+                                                Dict.insert key processed model.processedDocuments
                                         in
                                             { model
                                                 | parsedDocuments = parsedDocuments
@@ -543,8 +545,8 @@ update msg model =
             let
                 maybeResolvedDocument =
                     case model.route of
-                        Just (Document index _) ->
-                            Dict.get index model.processedDocuments
+                        CollectionItem collection key _ ->
+                            Dict.get key model.processedDocuments
 
                         _ ->
                             Nothing
@@ -563,12 +565,12 @@ update msg model =
 
                         Nothing ->
                             []
-                
+
                 rpcToCommandAndId rpc =
                     case Datadown.Rpc.toCommand RpcResponded rpc of
                         Just command ->
                             Just ( rpc.id, command )
-                        
+
                         Nothing ->
                             Nothing
 
@@ -576,27 +578,27 @@ update msg model =
                     rpcs
                         |> List.filterMap rpcToCommandAndId
                         |> List.unzip
-                
+
                 emptyResponses =
                     List.repeat (List.length ids) Nothing
                         |> List.map2 (,) ids
                         |> Dict.fromList
-                
+
                 rpcResponses =
                     model.rpcResponses
                         |> Dict.union emptyResponses
-                
+
                 newModel =
                     modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses }
             in
                 newModel ! commands
-        
+
         BeginRpcWithID id reload ->
             let
                 maybeResolvedDocument =
                     case model.route of
-                        Just (Document index _) ->
-                            Dict.get index model.processedDocuments
+                        CollectionItem collection key _ ->
+                            Dict.get key model.processedDocuments
 
                         _ ->
                             Nothing
@@ -615,7 +617,7 @@ update msg model =
 
                         Nothing ->
                             []
-                
+
                 maybeRpc =
                     rpcs
                         |> List.filter (\rpc -> rpc.id == id)
@@ -630,10 +632,10 @@ update msg model =
                                         Dict.insert id Nothing model.rpcResponses
                                 in
                                     modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! [ command ]
-                            
+
                             Nothing ->
                                 model ! []
-                    
+
                     Nothing ->
                         model ! []
 
@@ -643,6 +645,20 @@ update msg model =
                     Dict.insert response.id (Just response) model.rpcResponses
             in
                 modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! []
+
+        LoadedGitHubComponents owner repo result ->
+            case result of
+                Ok contentInfos ->
+                    let
+                        documentSources =
+                            contentInfos
+                                |> List.filterMap (\r -> r.content |> Maybe.map (\content -> ( r.path, content )))
+                                |> Dict.fromList
+                    in
+                        { model | documentSources = documentSources } ! []
+
+                Err error ->
+                    model ! []
 
 
 subscriptions : Model -> Sub Message
@@ -673,7 +689,7 @@ viewExpressionToken token =
 
         Operator operator ->
             div [] [ text (toString operator) ]
-        
+
         Url url ->
             div [] [ text (toString url) ]
 
@@ -927,53 +943,28 @@ viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
     div [ class "fixed z-50 w-full h-8 bg-indigo-darkest", class "bg-red" ]
         [ case model.route of
-            Just DocumentsList ->
+            Collection collection ->
                 div [ row, class "px-2 h-8 justify-between" ]
                     [ button [ onClick NewDocument, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "plus", text " New" ]
                     , button [ class "px-2 py-1 text-indigo-lightest rounded-sm" ] [ viewFontAwesomeIcon "share", text " Export" ]
                     ]
 
-            Just (Document index editMode) ->
-                let
-                    canGoPrevious =
-                        index /= 0
+            CollectionItem collection key editMode ->
+                div [ row, class "h-8 self-end flex-shrink items-center" ]
+                    [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
+                    , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text key ]
+                    , button [ onClick BeginLoading, class "px-2 py-1 text-yellow-lighter" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
+                    ]
 
-                    canGoNext =
-                        index < Array.length model.documentSources - 1
-
-                    button2 isDisabled clickMsg attributes children =
-                        button
-                            ((if isDisabled then
-                                [ disabled True, class "opacity-25" ]
-                              else
-                                [ onClick clickMsg ]
-                             )
-                                ++ attributes
-                            )
-                            children
-                in
-                    div [ row, class "h-8 self-end flex-shrink items-center" ]
-                        [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
-                        , button2 (not canGoPrevious)
-                            GoToPreviousDocument
-                            [ class "px-2 py-1 text-indigo-lightest" ]
-                            [ viewFontAwesomeIcon "caret-left" ]
-                        , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text (index + 1 |> toString) ]
-                        , button2 (not canGoNext)
-                            GoToNextDocument
-                            [ class "px-2 py-1 text-indigo-lightest" ]
-                            [ viewFontAwesomeIcon "caret-right" ]
-                        , button [ onClick BeginLoading, class "px-2 py-1 text-yellow-lighter" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
-                        ]
             _ ->
                 div [] []
         ]
 
 
-viewDocuments : Model -> Html Message
-viewDocuments model =
+viewDocuments : CollectionSource -> Model -> Html Message
+viewDocuments collection model =
     let
-        viewDocument index documentSource =
+        viewDocument key documentSource =
             let
                 firstLine =
                     documentSource
@@ -1000,7 +991,7 @@ viewDocuments model =
                             em [] [ text "Untitled" ]
             in
                 h2 [ class "" ]
-                    [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentAtIndex index) ]
+                    [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentWithKey collection key) ]
                         [ titleHtml ]
                     ]
     in
@@ -1008,7 +999,7 @@ viewDocuments model =
             [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
             , div [ class "flex-1 w-full max-w-lg mx-auto" ]
                 [ div [ class "border-t border-blue-lighter" ]
-                    (Array.indexedMap viewDocument model.documentSources |> Array.toList)
+                    (Dict.map viewDocument model.documentSources |> Dict.values)
                 ]
             ]
 
@@ -1062,7 +1053,7 @@ viewDocumentSource model documentSource resolvedDocument =
     let
         editorHtml =
             case model.route of
-                Just (Document _ Off) ->
+                CollectionItem _ _ Off ->
                     text ""
 
                 _ ->
@@ -1072,7 +1063,7 @@ viewDocumentSource model documentSource resolvedDocument =
 
         previewHtml =
             case model.route of
-                Just (Document _ Only) ->
+                CollectionItem _ _ Only ->
                     text ""
 
                 _ ->
@@ -1093,16 +1084,16 @@ view : Model -> Html Message
 view model =
     div [ class "flex justify-center flex-1" ]
         [ case model.route of
-            Just DocumentsList ->
-                viewDocuments model
+            Collection collection ->
+                viewDocuments collection model
 
-            Just (Document index _) ->
+            CollectionItem _ key _ ->
                 Maybe.map2
                     (viewDocumentSource model)
-                    (Array.get index model.documentSources)
-                    (Dict.get index model.processedDocuments)
-                    |> Maybe.withDefault (div [] [ text <| "No document #" ++ (toString <| index + 1) ])
-            
+                    (Dict.get key model.documentSources)
+                    (Dict.get key model.processedDocuments)
+                    |> Maybe.withDefault (div [] [ text <| "No document #" ++ key ])
+
             _ ->
                 div [ col, class "flex flex-row flex-1 max-w-lg p-4 text-center text-grey-darkest" ]
                     [ h1 [ class "mb-2 text-center" ]

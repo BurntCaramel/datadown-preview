@@ -409,10 +409,10 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                                             case qualifier of
                                                 Datadown.Always ->
                                                     False
-                                                
+
                                                 Datadown.Flag bool ->
                                                     not bool
-                                                
+
                                                 Datadown.Expression expression ->
                                                     True
                                     in

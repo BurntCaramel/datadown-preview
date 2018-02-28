@@ -205,7 +205,7 @@ processDocumentBlock parseExpressions block document =
                 contentAndExpressions =
                     List.map (List.filterMap (processContentBlock parseExpressions)) items
                         |> List.concat
-                
+
                 parseContentAndQualifier content =
                     case content of
                         Datadown.Text text ->
@@ -215,7 +215,7 @@ processDocumentBlock parseExpressions block document =
                                 ( Datadown.Text <| String.dropLeft 4 text, Datadown.Flag False )
                             else
                                 ( Datadown.Text text, Datadown.Always )
-                        
+
                         _ ->
                             ( content, Datadown.Always )
 

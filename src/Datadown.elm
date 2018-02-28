@@ -3,7 +3,7 @@ module Datadown
         ( Document
         , Section(..)
         , Content(..)
-        , ListItemQualifier (..)
+        , ListItemQualifier(..)
         )
 
 {-| A library for Datadown parsing
@@ -31,7 +31,7 @@ type Content a
     = Text String
     | Code (Maybe String) String -- ```html …
     | Expressions a -- ``` …
-    | List (List (Content a, ListItemQualifier a)) -- | - … | - [x] … | - [ ] …
+    | List (List ( Content a, ListItemQualifier a )) -- | - … | - [x] … | - [ ] …
     | Quote (Document a) -- > …
     | Json JsonValue
     | Reference String (List String) JsonValue
