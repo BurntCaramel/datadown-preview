@@ -29,4 +29,16 @@ Click me!
   {{ content }}
 </button>
 ```
+
+---
+
+> ## content
+> Button title
+> ## color
+> red
+
+## view
+```css
+button.bg-red.border-red { content: 'Button title'; }
+```
 """
