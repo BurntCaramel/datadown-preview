@@ -888,10 +888,6 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                 not hasSubsections
             else
                 False
-
-        -- FIXME: total hack
-        isSingular =
-            String.endsWith ": text" sectionTitle
     in
         if showNothing then
             []
@@ -902,6 +898,10 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         |> String.split ":"
                         |> List.head
                         |> Maybe.withDefault ""
+                
+                -- FIXME: total hack
+                isSingular =
+                    String.endsWith ": text" sectionTitle
 
                 key =
                     baseTitle
@@ -909,40 +909,33 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         |> List.reverse
                         |> String.join "."
 
-                jsonToString json =
+                jsonToStrings json =
                     case json of
                         StringValue s ->
-                            s
+                            [ s ]
 
                         NumericValue n ->
-                            toString n
+                            [ toString n ]
 
                         BoolValue b ->
                             if b then
-                                "✅"
+                                [ "✅" ]
                             else
-                                "❎"
+                                [ "❎" ]
 
                         ArrayValue items ->
-                            if isSingular then
-                                items
-                                    |> List.head
-                                    |> Maybe.map jsonToString
-                                    |> Maybe.withDefault ""
-                            else
-                                items
-                                    |> List.map jsonToString
-                                    |> String.join "\n"
+                            items
+                                |> List.concatMap jsonToStrings
 
                         _ ->
-                            ""
+                            []
 
-                defaultValue =
+                defaultValues : List String
+                defaultValues =
                     contentResults
                         |> List.filterMap (Result.toMaybe)
                         |> List.filterMap (options.contentToJson >> Result.toMaybe)
-                        |> List.map jsonToString
-                        |> String.join "\n"
+                        |> List.concatMap jsonToStrings
 
                 stringValue =
                     case Dict.get key options.sectionInputs of
@@ -953,23 +946,39 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                             s
 
                         Just json ->
-                            jsonToString json
+                            if isSingular then
+                                jsonToStrings json |> List.head |> Maybe.withDefault ""
+                            else
+                                jsonToStrings json |> String.join "\n"
 
                 hasSubsections =
                     not <| List.isEmpty subsections
+                
+                optionHtmlFor string =
+                    option [ value string ] [ text string ]
             in
                 if hasSubsections then
                     []
+                else if List.length defaultValues > 1 then
+                    [ select
+                        [ value stringValue
+                        , onInput (ChangeSectionInput key)
+                        , class "w-full mb-3 px-2 py-2 bg-blue-lightest border border-blue text-base appearance-none"
+                        ]
+                        (List.map optionHtmlFor defaultValues)
+                    ]
                 else
                     [ textarea
                         [ value stringValue
-                        , placeholder defaultValue
+                        , placeholder (String.join "\n" defaultValues)
                         , onInput (ChangeSectionInput key)
                         , rows 3
                         , class "w-full mb-3 px-2 py-2 bg-blue-lightest border border-blue"
                         ]
                         []
                     ]
+                    
+                    
         else
             contentResults
                 |> List.map (viewContentResult options)
