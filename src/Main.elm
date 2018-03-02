@@ -748,7 +748,7 @@ viewCode options maybeLanguage source =
         if not options.compact && showCodeForLanguage maybeLanguage then
             div []
                 [ div [] [ previewHtml ]
-                , details [ class "mt-2 rounded" ]
+                , details [ class "mt-2" ]
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker border border-purple-lightest cursor-pointer" ]
                         [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
@@ -963,7 +963,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                     [ select
                         [ value stringValue
                         , onInput (ChangeSectionInput key)
-                        , class "w-full mb-3 px-2 py-2 bg-blue-lightest border border-blue text-base appearance-none"
+                        , class "w-full mb-3 px-2 py-1 control rounded"
                         ]
                         (List.map optionHtmlFor defaultValues)
                     ]
@@ -973,7 +973,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         , placeholder (String.join "\n" defaultValues)
                         , onInput (ChangeSectionInput key)
                         , rows 3
-                        , class "w-full mb-3 px-2 py-2 bg-blue-lightest border border-blue"
+                        , class "w-full mb-3 px-2 py-1 control rounded-sm"
                         ]
                         []
                     ]

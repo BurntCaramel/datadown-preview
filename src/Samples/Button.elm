@@ -7,11 +7,15 @@ source =
 
 A button similar to Bootstrap 4’s.
 
-## content
-Button
+## content: text
+Click me!
 
-## color
-purple
+## color: text
+- purple
+- orange
+- red
+- green
+- blue
 
 ## classes
 - inline-block px-3 py-2

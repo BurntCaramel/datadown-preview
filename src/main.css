@@ -48,4 +48,13 @@ details:not([open]) > summary .summary-indicator-inline:before {
   background-color: #9561e214;
 }
 
+.control {
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.10);
+  border-color: #DCE2E8;
+  border-top-color: #E8EDF1;
+  border-bottom-color: #C2CBD3;
+  @apply .text-base .leading-normal;
+  @apply .bg-white .border .appearance-none;
+}
+
 @tailwind utilities;
