@@ -3,7 +3,7 @@ module Main exposing (main)
 import Html exposing (..)
 import Navigation exposing (Location)
 import UrlParser exposing ((</>), (<?>), s, int, string, intParam, oneOf, parsePath)
-import Html.Attributes exposing (class, id, rows, attribute, value, disabled, href)
+import Html.Attributes exposing (class, id, rows, attribute, value, placeholder, disabled, href)
 import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
@@ -57,9 +57,10 @@ type Error
 type alias DisplayOptions =
     { compact : Bool
     , hideNoContent : Bool
-    , processDocument : Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
+    , processDocument : Document Expressions -> Resolved Evaluate.Error Expressions
     , sectionInputs : Dict String JsonValue
     , getRpcResponse : Datadown.Rpc.Id -> Maybe (Maybe Datadown.Rpc.Response)
+    , contentToJson : Content Expressions -> Result Evaluate.Error JsonValue
     }
 
 
@@ -114,17 +115,12 @@ builtInValueFromModel model key =
 
 valueFromModel : Model -> String -> Maybe JsonValue
 valueFromModel model key =
-    let
-        keyPath =
-            key
-                |> String.split "."
-    in
-        case Dict.get key model.sectionInputs of
-            Just value ->
-                Just value
+    case Dict.get key model.sectionInputs of
+        Just value ->
+            Just value
 
-            Nothing ->
-                builtInValueFromModel model key
+        Nothing ->
+            builtInValueFromModel model key
 
 
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
@@ -194,7 +190,7 @@ valueForRpcID model id keyPath json =
                 Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
 
 
-contentToJson : Model -> Content (Result Error (List (List Token))) -> Result Evaluate.Error JsonValue
+contentToJson : Model -> Content Expressions -> Result Evaluate.Error JsonValue
 contentToJson model content =
     case content of
         Text text ->
@@ -218,7 +214,9 @@ contentToJson model content =
                 |> Ok
 
         Code maybeLanguage source ->
-            Ok <| JsonValue.StringValue <| String.trim source
+            String.trim source
+                |> JsonValue.StringValue
+                |> Ok
 
         Reference id keyPath json ->
             valueForRpcID model id keyPath json
@@ -482,8 +480,13 @@ update msg model =
                     StringValue newInput
 
                 newSectionInputs =
-                    model.sectionInputs
-                        |> Dict.insert sectionTitle newValue
+                    case String.split ":" sectionTitle of
+                        head :: tail ->
+                            model.sectionInputs
+                                |> Dict.insert head newValue
+                        
+                        _ ->
+                            model.sectionInputs
 
                 newModel =
                     { model | sectionInputs = newSectionInputs }
@@ -842,47 +845,95 @@ viewContentResult options contentResult =
             div [ class "mb-3" ] [ viewContent options content ]
 
 
-viewContentResults : DisplayOptions -> List String -> String -> List (Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token))))) -> List b -> List (Html Message)
+viewContentResults : DisplayOptions -> List String -> String -> List (Result (Process.Error Evaluate.Error) (Content Expressions)) -> List b -> List (Html Message)
 viewContentResults options parentPath sectionTitle contentResults subsections =
-    case contentResults of
-        [] ->
-            if options.hideNoContent then
-                []
+    let
+        showNothing =
+            List.isEmpty contentResults && options.hideNoContent
+
+        hasSubsections =
+            not <| List.isEmpty subsections
+        
+        showEditor =
+            if String.contains ":" sectionTitle then
+                True
+            else if List.isEmpty contentResults then
+                not hasSubsections
             else
-                let
-                    baseTitle =
-                        sectionTitle
-                            |> String.split ":"
-                            |> List.head
-                            |> Maybe.withDefault ""
+                False
+        
+        -- FIXME: total hack
+        isSingular =
+            String.endsWith ": text" sectionTitle
+    in
+        if showNothing then
+            []
+        else if showEditor then
+            let
+                baseTitle =
+                    sectionTitle
+                        |> String.split ":"
+                        |> List.head
+                        |> Maybe.withDefault ""
 
-                    key =
-                        baseTitle
-                            :: parentPath
-                            |> List.reverse
-                            |> String.join "."
+                key =
+                    baseTitle
+                        :: parentPath
+                        |> List.reverse
+                        |> String.join "."
+                
+                jsonToString json =
+                    case json of
+                        StringValue s ->
+                            s
+                        
+                        NumericValue n ->
+                            toString n
+                        
+                        BoolValue b ->
+                            if b then "✅" else "❎"
+                        
+                        ArrayValue items ->
+                            if isSingular then
+                                items
+                                    |> List.head
+                                    |> Maybe.map jsonToString
+                                    |> Maybe.withDefault ""
+                            else
+                                items
+                                    |> List.map jsonToString
+                                    |> String.join "\n"
+                        
+                        _ ->
+                            ""
 
-                    stringValue =
-                        case Dict.get key options.sectionInputs of
-                            Nothing ->
-                                ""
+                defaultValue =
+                    contentResults
+                        |> List.filterMap (Result.toMaybe)
+                        |> List.filterMap (options.contentToJson >> Result.toMaybe)
+                        |> List.map jsonToString
+                        |> String.join "\n"
 
-                            Just (StringValue s) ->
-                                s
+                stringValue =
+                    case Dict.get key options.sectionInputs of
+                        Nothing ->
+                            ""
 
-                            json ->
-                                toString json
+                        Just (StringValue s) ->
+                            s
 
-                    hasSubsections =
-                        not <| List.isEmpty subsections
-                in
-                    if hasSubsections then
-                        []
-                    else
-                        [ textarea [ value stringValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
-                        ]
+                        Just json ->
+                            jsonToString json
 
-        _ ->
+                hasSubsections =
+                    not <| List.isEmpty subsections
+            in
+                if hasSubsections then
+                    []
+                else
+                    [ textarea [ value stringValue, placeholder defaultValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
+                    ]
+        else
             contentResults
                 |> List.map (viewContentResult options)
 
@@ -1019,6 +1070,7 @@ viewDocumentPreview model resolved =
             , processDocument = processDocumentWithModel model
             , sectionInputs = model.sectionInputs
             , getRpcResponse = (flip Dict.get) model.rpcResponses
+            , contentToJson = contentToJson model
             }
 
         sectionsHtml : List (Html Message)
