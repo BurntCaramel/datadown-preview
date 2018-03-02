@@ -2,12 +2,10 @@ module Main exposing (main)
 
 import Html exposing (..)
 import Navigation exposing (Location)
-import UrlParser exposing ((</>), (<?>), s, int, string, intParam, oneOf, parsePath)
 import Html.Attributes exposing (class, id, rows, attribute, value, placeholder, disabled, href)
 import Html.Events exposing (onInput, onClick)
 import Time exposing (Time)
 import Date
-import Array exposing (Array)
 import Dict exposing (Dict)
 import Task
 import Http
@@ -44,7 +42,6 @@ type alias Model =
     , now : Time
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
-    , gitHubContents : Dict ( String, String ) (List Services.GitHub.ContentInfo)
     }
 
 
@@ -290,7 +287,6 @@ init flags location =
             , now = 0
             , sectionInputs = Dict.empty
             , rpcResponses = Dict.empty
-            , gitHubContents = Dict.empty
             }
 
         maybeCollection =
