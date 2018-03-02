@@ -35,14 +35,9 @@ languageToView language =
     Dict.get language languageToViewTable
 
 
-defaultView : Maybe String -> String -> Html msg
-defaultView maybeLanguage source =
-    text (maybeLanguage |> Maybe.withDefault "none")
-
-
 {-| Previews a HTML string as santized HTML
 -}
-view : Maybe String -> String -> Html msg
+view : Maybe String -> String -> Maybe (Html msg)
 view maybeLanguage source =
     let
         maybeView =
@@ -51,7 +46,7 @@ view maybeLanguage source =
     in
         case maybeView of
             Just view ->
-                view source
+                Just <| view source
 
             Nothing ->
-                defaultView maybeLanguage source
+                Nothing

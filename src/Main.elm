@@ -700,6 +700,14 @@ col =
     class "flex flex-col"
 
 
+open : Bool -> Html.Attribute msg
+open flag =
+    if flag then
+        attribute "open" ""
+    else
+        class ""
+
+
 viewExpressionToken : Token -> Html Message
 viewExpressionToken token =
     case token of
@@ -742,13 +750,16 @@ viewCode options maybeLanguage source =
                 _ ->
                     ""
 
-        previewHtml =
+        maybePreviewHtml =
             Preview.view maybeLanguage (sourcePrefix ++ "\n" ++ source)
+        
+        sourceIsOpen =
+            maybePreviewHtml == Nothing
     in
         if not options.compact && showCodeForLanguage maybeLanguage then
             div []
-                [ div [] [ previewHtml ]
-                , details [ class "mt-2" ]
+                [ div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
+                , details [ class "mt-2", open sourceIsOpen ]
                     [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker border border-purple-lightest cursor-pointer" ]
                         [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
                     , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
@@ -756,7 +767,7 @@ viewCode options maybeLanguage source =
                     ]
                 ]
         else
-            div [] [ previewHtml ]
+            div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
 
 
 viewRpc : Rpc -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
