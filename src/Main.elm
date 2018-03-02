@@ -117,32 +117,27 @@ builtInValueFromModel model key =
             Nothing
 
 
-valueFromModel : Model -> String -> Maybe JsonValue
-valueFromModel model key =
-    case Dict.get key model.sectionInputs of
-        Just value ->
-            Just value
-
-        Nothing ->
-            builtInValueFromModel model key
-
-
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
 evaluateExpressions model resolveFromDocument parsedExpressions =
     let
         resolveWithModel : String -> Result (Process.Error Evaluate.Error) JsonValue
         resolveWithModel key =
-            case resolveFromDocument key of
-                Ok value ->
+            case Dict.get key model.sectionInputs of
+                Just value ->
                     Ok value
-
-                Err error ->
-                    case valueFromModel model key of
-                        Just value ->
+                
+                Nothing ->
+                    case resolveFromDocument key of
+                        Ok value ->
                             Ok value
+                        
+                        Err error ->
+                            case builtInValueFromModel model key of
+                                Just value ->
+                                    Ok value
 
-                        Nothing ->
-                            Err error
+                                Nothing ->
+                                    Err error
     in
         case parsedExpressions of
             Err error ->
@@ -966,7 +961,14 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                 if hasSubsections then
                     []
                 else
-                    [ textarea [ value stringValue, placeholder defaultValue, onInput (ChangeSectionInput key), rows 3, class "w-full px-2 py-2 bg-blue-lightest border border-blue" ] []
+                    [ textarea
+                        [ value stringValue
+                        , placeholder defaultValue
+                        , onInput (ChangeSectionInput key)
+                        , rows 3
+                        , class "w-full px-2 py-2 bg-blue-lightest border border-blue"
+                        ]
+                        []
                     ]
         else
             contentResults
