@@ -335,8 +335,21 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                 findContentInSection ( fullKey, resolvedSection ) =
                     case resolvedSection of
                         ResolvedSection record ->
-                            case String.split ":" fullKey of
-                                baseKey :: kind :: [] ->
+                            let
+                                maybeBaseKey =
+                                    case String.split ":" fullKey of
+                                        baseKey :: kind :: [] ->
+                                            Just baseKey
+                                        
+                                        baseKey :: [] ->
+                                            Just baseKey
+
+                                        _ ->
+                                            Nothing
+                            in
+                                
+                            case maybeBaseKey of
+                                Just baseKey ->
                                     if baseKey == firstKey then
                                         case record.mainContent of
                                             [] ->
@@ -348,7 +361,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                     else
                                         Nothing
 
-                                _ ->
+                                Nothing ->
                                     Nothing
 
                 findInSections resolvedSections =
