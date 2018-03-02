@@ -28,7 +28,6 @@ import Datadown exposing (Document, Section(..), Content(..), ListItemQualifier)
 import Datadown.Rpc as Rpc exposing (Rpc)
 import JsonValue exposing (JsonValue)
 import Json.Decode
-import Http
 
 
 {-| Error after processing, possibly from evaluating expressions
