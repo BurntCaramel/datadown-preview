@@ -966,7 +966,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         , placeholder defaultValue
                         , onInput (ChangeSectionInput key)
                         , rows 3
-                        , class "w-full px-2 py-2 bg-blue-lightest border border-blue"
+                        , class "w-full mb-3 px-2 py-2 bg-blue-lightest border border-blue"
                         ]
                         []
                     ]
