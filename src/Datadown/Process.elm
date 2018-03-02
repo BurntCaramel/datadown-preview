@@ -347,7 +347,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                                 Just (List.concatMap resolveContentResult record.mainContent)
                                     else
                                         Nothing
-                                
+
                                 _ ->
                                     Nothing
 

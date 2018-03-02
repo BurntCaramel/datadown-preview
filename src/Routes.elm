@@ -5,6 +5,8 @@ module Routes
         , EditMode(..)
         , parseLocation
         , toPath
+        , CollectionSourceId
+        , collectionSourceToId
         )
 
 import Dict exposing (Dict)
@@ -104,6 +106,16 @@ toPath route =
 
         NotFound path ->
             path
+
+
+type alias CollectionSourceId =
+    String
+
+
+collectionSourceToId : CollectionSource -> CollectionSourceId
+collectionSourceToId collectionSource =
+    Collection collectionSource
+        |> toPath
 
 
 parseLocation : Location -> Route

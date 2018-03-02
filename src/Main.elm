@@ -34,11 +34,17 @@ type alias Expressions =
     Result Error (List (List Token))
 
 
+type SourceStatus
+    = Loading
+    | Loaded
+
+
 type alias Model =
     { documentSources : Dict String String
     , parsedDocuments : Dict String (Document Expressions)
     , processedDocuments : Dict String (Resolved Evaluate.Error Expressions)
     , route : Route
+    , sourceStatuses : Dict Routes.CollectionSourceId SourceStatus
     , now : Time
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
@@ -265,57 +271,69 @@ modelWithCurrentDocumentProcessed model =
 init : Flags -> Location -> ( Model, Cmd Message )
 init flags location =
     let
-        documentSources =
-            [ ( "welcome", Samples.Welcome.source )
-            , ( "clock", Samples.Clock.source )
-            , ( "button", Samples.Button.source )
-            , ( "images", Samples.Images.source )
-            , ( "api", Samples.API.source )
-            , ( "user-profile", Samples.UserProfile.source )
-            , ( "try", "# Now your turn!" )
-            ]
-                |> Dict.fromList
-
         route =
             Routes.parseLocation location
+
+        maybeCollection =
+            case route of
+                Collection collection ->
+                    Just collection
+
+                CollectionItem collection _ _ ->
+                    Just collection
+
+                _ ->
+                    Nothing
+
+        ( sourceStatuses, documentSources, commands ) =
+            case maybeCollection of
+                Just (GitHubRepo owner repo branch) ->
+                    ( Dict.singleton
+                        (GitHubRepo owner repo branch |> Routes.collectionSourceToId)
+                        Loading
+                    , Dict.empty
+                    , [ Services.GitHub.listDocuments owner repo
+                            |> Task.attempt (LoadedGitHubComponents owner repo branch)
+                      ]
+                    )
+
+                Just Example ->
+                    ( Dict.singleton
+                        (Example |> Routes.collectionSourceToId)
+                        Loaded
+                    , [ ( "welcome", Samples.Welcome.source )
+                      , ( "clock", Samples.Clock.source )
+                      , ( "button", Samples.Button.source )
+                      , ( "images", Samples.Images.source )
+                      , ( "api", Samples.API.source )
+                      , ( "user-profile", Samples.UserProfile.source )
+                      , ( "try", "# Now your turn!" )
+                      ]
+                        |> Dict.fromList
+                    , []
+                    )
+
+                _ ->
+                    ( Dict.empty, Dict.empty, [] )
 
         model =
             { documentSources = documentSources
             , parsedDocuments = Dict.empty
             , processedDocuments = Dict.empty
             , route = route
+            , sourceStatuses = sourceStatuses
             , now = 0
             , sectionInputs = Dict.empty
             , rpcResponses = Dict.empty
             }
+                |> case route of
+                    CollectionItem _ key _ ->
+                        modelWithDocumentProcessed key
 
-        maybeCollection =
-            case route of
-                Collection collection ->
-                    Just collection
-                
-                CollectionItem collection _ _ ->
-                    Just collection
-                
-                _ ->
-                    Nothing
-        
-        commands =
-            case maybeCollection of
-                Just (GitHubRepo owner repo branch) ->
-                    [ Services.GitHub.listDocuments owner repo
-                        |> Task.attempt (LoadedGitHubComponents owner repo)
-                    ]
-                
-                _ ->
-                    []
+                    _ ->
+                        identity
     in
-        case route of
-            CollectionItem source key _ ->
-                modelWithDocumentProcessed key model ! commands
-
-            _ ->
-                model ! commands
+        model ! commands
 
 
 type Message
@@ -331,7 +349,7 @@ type Message
     | BeginLoading
     | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
-    | LoadedGitHubComponents String String (Result Http.Error (List Services.GitHub.ContentInfo))
+    | LoadedGitHubComponents String String String (Result Http.Error (List Services.GitHub.ContentInfo))
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -381,7 +399,7 @@ update msg model =
                             let
                                 newIndex =
                                     max 0 (index - 1)
-                                
+
                                 newKey =
                                     toString newIndex
 
@@ -411,7 +429,7 @@ update msg model =
 
                                 newIndex =
                                     min maxIndex (index + 1)
-                                
+
                                 newKey =
                                     toString newIndex
 
@@ -480,7 +498,7 @@ update msg model =
                         head :: tail ->
                             model.sectionInputs
                                 |> Dict.insert head newValue
-                        
+
                         _ ->
                             model.sectionInputs
 
@@ -645,7 +663,7 @@ update msg model =
             in
                 modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! []
 
-        LoadedGitHubComponents owner repo result ->
+        LoadedGitHubComponents owner repo branch result ->
             case result of
                 Ok contentInfos ->
                     let
@@ -653,8 +671,17 @@ update msg model =
                             contentInfos
                                 |> List.filterMap (\r -> r.content |> Maybe.map (\content -> ( r.path, content )))
                                 |> Dict.fromList
+
+                        sourceStatuses =
+                            model.sourceStatuses
+                                |> Dict.insert (GitHubRepo owner repo branch |> Routes.collectionSourceToId)
+                                    Loaded
                     in
-                        { model | documentSources = documentSources } ! []
+                        { model
+                            | documentSources = documentSources
+                            , sourceStatuses = sourceStatuses
+                        }
+                            ! []
 
                 Err error ->
                     model ! []
@@ -849,7 +876,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
 
         hasSubsections =
             not <| List.isEmpty subsections
-        
+
         showEditor =
             if String.contains ":" sectionTitle then
                 True
@@ -857,7 +884,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                 not hasSubsections
             else
                 False
-        
+
         -- FIXME: total hack
         isSingular =
             String.endsWith ": text" sectionTitle
@@ -877,18 +904,21 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         :: parentPath
                         |> List.reverse
                         |> String.join "."
-                
+
                 jsonToString json =
                     case json of
                         StringValue s ->
                             s
-                        
+
                         NumericValue n ->
                             toString n
-                        
+
                         BoolValue b ->
-                            if b then "✅" else "❎"
-                        
+                            if b then
+                                "✅"
+                            else
+                                "❎"
+
                         ArrayValue items ->
                             if isSingular then
                                 items
@@ -899,7 +929,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                                 items
                                     |> List.map jsonToString
                                     |> String.join "\n"
-                        
+
                         _ ->
                             ""
 
@@ -1041,12 +1071,34 @@ viewDocuments collection model =
                     [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentWithKey collection key) ]
                         [ titleHtml ]
                     ]
+
+        innerHtmls =
+            case Dict.get (Routes.collectionSourceToId collection) model.sourceStatuses of
+                Just Loaded ->
+                    (Dict.map viewDocument model.documentSources |> Dict.values)
+
+                Just Loading ->
+                    let
+                        message =
+                            case collection of
+                                GitHubRepo owner repoName branch ->
+                                    "Loading @" ++ owner ++ "/" ++ repoName ++ "/" ++ branch ++ " from GitHub…"
+
+                                Example ->
+                                    "Loading examples…"
+                    in
+                        [ h2 [ class "mt-3" ]
+                            [ text message ]
+                        ]
+
+                _ ->
+                    []
     in
         div [ col, class "flex-1 justify-center" ]
             [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
             , div [ class "flex-1 w-full max-w-lg mx-auto" ]
                 [ div [ class "border-t border-blue-lighter" ]
-                    (Dict.map viewDocument model.documentSources |> Dict.values)
+                    innerHtmls
                 ]
             ]
 
