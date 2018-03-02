@@ -22,7 +22,7 @@ import HtmlParser.Util
 -}
 unsafeTagNames : List String
 unsafeTagNames =
-    [ "script", "link", "iframe", "object", "embed" ]
+    [ "script", "iframe", "object", "embed" ]
 
 
 isSafeElement : String -> HtmlParser.Attributes -> List HtmlParser.Node -> Bool
