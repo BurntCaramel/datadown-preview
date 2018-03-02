@@ -64,6 +64,7 @@ type alias DisplayOptions =
     , sectionInputs : Dict String JsonValue
     , getRpcResponse : Datadown.Rpc.Id -> Maybe (Maybe Datadown.Rpc.Response)
     , contentToJson : Content Expressions -> Result Evaluate.Error JsonValue
+    , baseHtmlSource : String
     }
 
 
@@ -738,8 +739,16 @@ showCodeForLanguage language =
 viewCode : DisplayOptions -> Maybe String -> String -> Html Message
 viewCode options maybeLanguage source =
     let
+        sourcePrefix =
+            case maybeLanguage of
+                Just "html" ->
+                    options.baseHtmlSource
+                
+                _ ->
+                    ""
+
         previewHtml =
-            Preview.view maybeLanguage source
+            Preview.view maybeLanguage (sourcePrefix ++ "\n" ++ source)
     in
         if not options.compact && showCodeForLanguage maybeLanguage then
             div []
@@ -1119,6 +1128,9 @@ viewDocumentPreview model resolved =
             , sectionInputs = model.sectionInputs
             , getRpcResponse = (flip Dict.get) model.rpcResponses
             , contentToJson = contentToJson model
+            , baseHtmlSource =
+                Dict.get "components/base.html" model.documentSources
+                    |> Maybe.withDefault ""
             }
 
         sectionsHtml : List (Html Message)
