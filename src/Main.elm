@@ -297,13 +297,13 @@ init flags location =
                     ( Dict.singleton
                         (Example |> Routes.collectionSourceToId)
                         Loaded
-                    , [ ( "welcome", Samples.Welcome.source )
-                      , ( "clock", Samples.Clock.source )
-                      , ( "button", Samples.Button.source )
-                      , ( "images", Samples.Images.source )
-                      , ( "api", Samples.API.source )
-                      , ( "user-profile", Samples.UserProfile.source )
-                      , ( "try", "# Now your turn!" )
+                    , [ ( "1-welcome", Samples.Welcome.source )
+                      , ( "2-clock", Samples.Clock.source )
+                      , ( "3-button", Samples.Button.source )
+                      , ( "4-images", Samples.Images.source )
+                      , ( "5-api", Samples.API.source )
+                      , ( "6-user-profile", Samples.UserProfile.source )
+                      , ( "7-now-try", "# Now your turn!" )
                       ]
                         |> Dict.fromList
                     , []
