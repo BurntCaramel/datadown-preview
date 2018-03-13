@@ -11,7 +11,6 @@ module Routes
 
 import Dict exposing (Dict)
 import Navigation exposing (Location)
-import UrlParser exposing (..)
 
 
 type EditMode
@@ -48,38 +47,40 @@ type Route
     | NotFound String
 
 
-intFrom1 : UrlParser.Parser (Int -> c) c
-intFrom1 =
-    UrlParser.map (\i -> i - 1) int
+fromPath : String -> Route
+fromPath path =
+    let
+        segments =
+            path
+                |> String.split "/"
+                |> List.filter ((/=) "")
+    in
+        case segments of
+            [] ->
+                Landing
+            
+            "example" :: rest ->
+                case rest of
+                    [] ->
+                        Collection Example
+                    
+                    items ->
+                        CollectionItem Example (String.join "/" items) WithPreview
+            
+            "github" :: owner :: repo :: ref :: rest ->
+                let
+                    collection =
+                        GitHubRepo owner repo ref
+                in
+                    case rest of
+                        [] ->
+                            Collection collection
+                        
+                        items ->
+                            CollectionItem collection (String.join "/" items) WithPreview
 
-
-locationParser : UrlParser.Parser (Route -> a) a
-locationParser =
-    oneOf
-        [ map Landing top
-        , map Collection <|
-            map Example <|
-                (s "example")
-        , map CollectionItem <|
-            (map Example <| s "example")
-                </> string
-                <?> customParam "editMode" editModeFromString
-        , map Collection <|
-            map GitHubRepo <|
-                (s "github" </> string </> string </> string)
-        , map CollectionItem <|
-            (map GitHubRepo <|
-                s "github"
-                    </> string
-                    -- owner
-                    </> string
-                    -- repo
-                    </> string
-             -- ref
-            )
-                </> string
-                <?> customParam "editMode" editModeFromString
-        ]
+            components ->
+                NotFound (String.join "/" components)
 
 
 toPath : Route -> String
@@ -120,5 +121,4 @@ collectionSourceToId collectionSource =
 
 parseLocation : Location -> Route
 parseLocation location =
-    parsePath locationParser location
-        |> Maybe.withDefault (NotFound location.pathname)
+    fromPath location.pathname
