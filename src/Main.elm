@@ -960,7 +960,10 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                 stringValue =
                     case Dict.get key options.sectionInputs of
                         Nothing ->
-                            ""
+                            if isSingular then
+                                defaultValues |> List.head |> Maybe.withDefault ""
+                            else
+                                ""
 
                         Just (StringValue s) ->
                             s
