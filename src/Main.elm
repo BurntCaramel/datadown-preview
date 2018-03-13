@@ -27,7 +27,7 @@ import Samples.Button
 import Samples.Images
 import Samples.API
 import Samples.UserProfile
-import Services.GitHub
+import Services.CollectedSource
 
 
 type alias Expressions =
@@ -288,7 +288,7 @@ init flags location =
                         (GitHubRepo owner repo branch |> Routes.collectionSourceToId)
                         Loading
                     , Dict.empty
-                    , [ Services.GitHub.listDocuments owner repo
+                    , [ Services.CollectedSource.listDocuments owner repo branch
                             |> Task.attempt (LoadedGitHubComponents owner repo branch)
                       ]
                     )
@@ -345,7 +345,7 @@ type Message
     | BeginLoading
     | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
-    | LoadedGitHubComponents String String String (Result Http.Error (List Services.GitHub.ContentInfo))
+    | LoadedGitHubComponents String String String (Result Http.Error (List Services.CollectedSource.ContentInfo))
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -680,7 +680,8 @@ update msg model =
                             ! []
 
                 Err error ->
-                    model ! []
+                    Debug.crash "Error!"
+                    -- model ! []
 
 
 subscriptions : Model -> Sub Message
@@ -1233,8 +1234,9 @@ view model =
                     [ h1 [ class "mb-2 text-center" ]
                         [ text "Datadown" ]
                     , h2 [ class "mb-4 text-center" ]
-                        [ text "Make components & prototypes with Markdown." ]
+                        [ text "Make components & prototypes simply by writing Markdown." ]
                     , h3 [] [ a [ href "/example" ] [ text "See examples" ] ]
+                    , h3 [] [ a [ href "/github/RoyalIcing/lofi-bootstrap/master" ] [ text "@RoyalIcing/lofi-bootstrap" ] ]
                     ]
 
         -- , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
