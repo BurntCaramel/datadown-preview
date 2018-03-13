@@ -956,11 +956,14 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         |> List.filterMap (Result.toMaybe)
                         |> List.filterMap (options.contentToJson >> Result.toMaybe)
                         |> List.concatMap jsonToStrings
+                
+                choiceCount =
+                    List.length defaultValues
 
                 stringValue =
                     case Dict.get key options.sectionInputs of
                         Nothing ->
-                            if isSingular then
+                            if choiceCount > 1 then
                                 defaultValues |> List.head |> Maybe.withDefault ""
                             else
                                 ""
@@ -994,7 +997,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         , text baseTitle
                         ]
                     ]
-                else if List.length defaultValues > 1 then
+                else if choiceCount > 1 then
                     [ select
                         [ value stringValue
                         , onInput (JsonValue.StringValue >> ChangeSectionInput key)
