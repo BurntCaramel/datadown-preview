@@ -2,8 +2,8 @@ module Main exposing (main)
 
 import Html exposing (..)
 import Navigation exposing (Location)
-import Html.Attributes exposing (class, id, rows, attribute, value, placeholder, disabled, href)
-import Html.Events exposing (onInput, onClick)
+import Html.Attributes exposing (class, id, rows, attribute, value, type_, placeholder, disabled, href)
+import Html.Events exposing (onInput, onCheck, onClick)
 import Time exposing (Time)
 import Date
 import Dict exposing (Dict)
@@ -347,7 +347,7 @@ type Message
     | GoToNextDocument
     | GoToDocumentWithKey CollectionSource String
     | NewDocument
-    | ChangeSectionInput String String
+    | ChangeSectionInput String JsonValue
     | Time Time
     | BeginLoading
     | BeginRpcWithID String Bool
@@ -491,11 +491,8 @@ update msg model =
                 }
                     ! []
 
-        ChangeSectionInput sectionTitle newInput ->
+        ChangeSectionInput sectionTitle newValue ->
             let
-                newValue =
-                    StringValue newInput
-
                 newSectionInputs =
                     case String.split ":" sectionTitle of
                         head :: tail ->
@@ -912,15 +909,19 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
             []
         else if showEditor then
             let
-                baseTitle =
-                    sectionTitle
-                        |> String.split ":"
-                        |> List.head
-                        |> Maybe.withDefault ""
+                (baseTitle, kind) =
+                    case String.split ":" sectionTitle of
+                        head :: second :: rest ->
+                            ( head, String.trim second )
+                        
+                        head :: [] ->
+                            ( head, "text" )
+
+                        [] ->
+                            ( "", "" )
                 
-                -- FIXME: total hack
                 isSingular =
-                    String.endsWith ": text" sectionTitle
+                    kind == "text"
 
                 key =
                     baseTitle
@@ -978,24 +979,45 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
             in
                 if hasSubsections then
                     []
+                else if kind == "bool" then
+                    [ label
+                        [ class "block" ]
+                        [ input
+                            [ type_ "checkbox"
+                            , onCheck (JsonValue.BoolValue >> ChangeSectionInput key)
+                            ]
+                            []
+                        , text " "
+                        , text baseTitle
+                        ]
+                    ]
                 else if List.length defaultValues > 1 then
                     [ select
                         [ value stringValue
-                        , onInput (ChangeSectionInput key)
+                        , onInput (JsonValue.StringValue >> ChangeSectionInput key)
                         , class "w-full mb-3 px-2 py-1 control rounded"
                         ]
                         (List.map optionHtmlFor defaultValues)
                     ]
                 else
-                    [ textarea
-                        [ value stringValue
-                        , placeholder (String.join "\n" defaultValues)
-                        , onInput (ChangeSectionInput key)
-                        , rows 3
-                        , class "w-full mb-3 px-2 py-1 control rounded-sm"
+                    let
+                        rowCount =
+                            case kind of
+                                "number" ->
+                                    1
+                                
+                                _ ->
+                                    3
+                    in
+                        [ textarea
+                            [ value stringValue
+                            , placeholder (String.join "\n" defaultValues)
+                            , onInput (JsonValue.StringValue >> ChangeSectionInput key)
+                            , rows rowCount
+                            , class "w-full mb-3 px-2 py-1 control rounded-sm"
+                            ]
+                            []
                         ]
-                        []
-                    ]
                     
                     
         else
