@@ -1074,35 +1074,10 @@ viewDocuments : CollectionSource -> Model -> Html Message
 viewDocuments collection model =
     let
         viewDocument key documentSource =
-            let
-                firstLine =
-                    documentSource
-                        |> String.trim
-                        |> String.lines
-                        |> List.head
-
-                maybeTitle =
-                    Maybe.map (parseDocument parseExpressions >> .title) firstLine
-                        |> Maybe.andThen
-                            (\line ->
-                                if String.isEmpty line then
-                                    Nothing
-                                else
-                                    Just line
-                            )
-
-                titleHtml =
-                    case maybeTitle of
-                        Just input ->
-                            text input
-
-                        Nothing ->
-                            em [] [ text "Untitled" ]
-            in
-                h2 [ class "" ]
-                    [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentWithKey collection key) ]
-                        [ titleHtml ]
-                    ]
+            h2 [ class "" ]
+                [ button [ class "w-full px-4 py-2 text-left text-2xl font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentWithKey collection key) ]
+                    [ text key ]
+                ]
 
         innerHtmls =
             case Dict.get (Routes.collectionSourceToId collection) model.sourceStatuses of
