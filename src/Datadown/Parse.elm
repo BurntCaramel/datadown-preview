@@ -171,8 +171,8 @@ sectionWithTitle title =
         }
 
 
-processDocumentBlock : (String -> a) -> Block b i -> Document a -> Document a
-processDocumentBlock parseExpressions block document =
+parseMarkdownBlock : (String -> a) -> Block b i -> Document a -> Document a
+parseMarkdownBlock parseExpressions block document =
     case block of
         Heading text 1 inlines ->
             { document | title = Inline.extractText inlines }
@@ -237,7 +237,7 @@ processDocumentBlock parseExpressions block document =
             let
                 innerDocument : Document a
                 innerDocument =
-                    processDocument parseExpressions blocks
+                    parseMarkdown parseExpressions blocks
             in
                 addContentToDocument (Datadown.Quote innerDocument) [] [] document
 
@@ -271,8 +271,8 @@ processDocumentBlock parseExpressions block document =
                     document
 
 
-processDocument : (String -> a) -> List (Block b i) -> Document a
-processDocument parseExpressions blocks =
+parseMarkdown : (String -> a) -> List (Block b i) -> Document a
+parseMarkdown parseExpressions blocks =
     let
         initialDocument =
             { title = ""
@@ -295,10 +295,13 @@ processDocument parseExpressions blocks =
                     document.sections
                         |> List.map postSection
                         |> List.reverse
+                , introContent =
+                    document.introContent
+                        |> List.reverse
             }
     in
         blocks
-            |> List.foldl (processDocumentBlock parseExpressions) initialDocument
+            |> List.foldl (parseMarkdownBlock parseExpressions) initialDocument
             |> postDocument
 
 
@@ -317,4 +320,4 @@ parseDocument parseExpressions input =
     input
         |> Block.parse Nothing
         -- using Config.defaultOptions
-        |> processDocument parseExpressions
+        |> parseMarkdown parseExpressions
