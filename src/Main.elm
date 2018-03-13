@@ -120,24 +120,31 @@ builtInValueFromModel model key =
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
 evaluateExpressions model resolveFromDocument parsedExpressions =
     let
+        defaultResolveWithModel : String -> Result (Process.Error Evaluate.Error) JsonValue
+        defaultResolveWithModel key =
+            case resolveFromDocument key of
+                Ok value ->
+                    Ok value
+                
+                Err error ->
+                    case builtInValueFromModel model key of
+                        Just value ->
+                            Ok value
+
+                        Nothing ->
+                            Err error
+
         resolveWithModel : String -> Result (Process.Error Evaluate.Error) JsonValue
         resolveWithModel key =
             case Dict.get key model.sectionInputs of
+                Just (JsonValue.StringValue "") ->
+                    defaultResolveWithModel key
+
                 Just value ->
                     Ok value
                 
                 Nothing ->
-                    case resolveFromDocument key of
-                        Ok value ->
-                            Ok value
-                        
-                        Err error ->
-                            case builtInValueFromModel model key of
-                                Just value ->
-                                    Ok value
-
-                                Nothing ->
-                                    Err error
+                    defaultResolveWithModel key
     in
         case parsedExpressions of
             Err error ->
