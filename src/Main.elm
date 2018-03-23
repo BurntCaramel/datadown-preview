@@ -2,7 +2,7 @@ module Main exposing (main)
 
 import Html exposing (..)
 import Navigation exposing (Location)
-import Html.Attributes exposing (class, id, rows, attribute, value, type_, placeholder, disabled, href)
+import Html.Attributes exposing (class, id, rows, attribute, value, type_, placeholder, disabled, href, style)
 import Html.Events exposing (onInput, onCheck, onClick)
 import Time exposing (Time)
 import Date
@@ -1095,7 +1095,8 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "fixed z-50 w-full h-8 bg-indigo-darkest", class "bg-red" ]
+    div [ class "h-8 bg-indigo-darkest"
+        ]
         [ case model.route of
             Collection collection ->
                 div [ row, class "px-2 h-8 justify-between" ]
@@ -1104,30 +1105,37 @@ viewDocumentNavigation model =
                     ]
 
             CollectionItem collection key editMode ->
-                div [ row, class "h-8 self-end flex-shrink items-center" ]
-                    [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-indigo-lightest" ] [ viewFontAwesomeIcon "list" ]
-                    , div [ class "py-1 text-center font-bold text-indigo-lightest" ] [ text key ]
+                div [ row, class "h-8 self-end flex-shrink justify-between items-center" ]
+                    [ button [ onClick GoToDocumentsList, class "px-2 py-1 text-white" ] [ viewFontAwesomeIcon "list" ]
+                    , div [ class "py-1 text-center font-bold text-white" ] [ text key ]
                     , button [ onClick BeginLoading, class "px-2 py-1 text-yellow-lighter" ] [ viewFontAwesomeIcon "arrow-circle-down" ]
                     ]
 
             _ ->
-                div [] []
+                text ""
         ]
 
 
-viewDocuments : CollectionSource -> Model -> Html Message
-viewDocuments collection model =
+viewListInner : CollectionSource -> Model -> Maybe String -> Html Message
+viewListInner collection model activeKey =
     let
-        viewDocument key documentSource =
+        viewItem key documentSource =
             h2 [ class "" ]
-                [ button [ class "w-full px-4 py-2 text-left text-lg font-bold text-blue bg-white border-b border-blue-lighter", onClick (GoToDocumentWithKey collection key) ]
+                [ button
+                    [ class "w-full px-4 py-2 text-left text-lg font-bold cursor-default"
+                    , if Just key == activeKey then
+                        class "text-indigo-darkest bg-blue-light"
+                    else
+                        class "text-white bg-indigo-darkest"
+                    , onClick (GoToDocumentWithKey collection key)
+                    ]
                     [ text key ]
                 ]
 
         innerHtmls =
             case Dict.get (Routes.collectionSourceToId collection) model.sourceStatuses of
                 Just Loaded ->
-                    (Dict.map viewDocument model.documentSources |> Dict.values)
+                    (Dict.map viewItem model.documentSources |> Dict.values)
 
                 Just Loading ->
                     let
@@ -1146,13 +1154,34 @@ viewDocuments collection model =
                 _ ->
                     []
     in
-        div [ col, class "flex-1 justify-center" ]
-            [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
-            , div [ class "flex-1 w-full max-w-lg mx-auto" ]
-                [ div [ class "border-t border-blue-lighter" ]
-                    innerHtmls
-                ]
+        div [ class "h-full bg-indigo-darkest" ]
+            innerHtmls
+
+
+viewCollectionSummary : CollectionSource -> Html Message
+viewCollectionSummary collection =
+    let
+        message =
+            case collection of
+                GitHubRepo owner repoName branch ->
+                    "@" ++ owner ++ "/" ++ repoName ++ "/" ++ branch ++ " from GitHub"
+
+                Example ->
+                    "Example"
+    in
+        div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
+            [ h2 [ class "text-white" ] [ text message ]
             ]
+
+
+viewList : CollectionSource -> Model -> Html Message
+viewList collection model =
+    div [ col, class "flex-1 justify-center" ]
+        [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
+        , div [ class "flex-1 w-full max-w-lg mx-auto" ]
+            [ viewListInner collection model Nothing
+            ]
+        ]
 
 
 processDocumentWithModel : Model -> Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
@@ -1225,10 +1254,7 @@ viewDocumentSource model documentSource resolvedDocument =
                     viewDocumentPreview model resolvedDocument
     in
         div [ col, class "flex-1 h-screen" ]
-            [ div [ row, class "mb-8 bg-indigo-darkest" ]
-                [ viewDocumentNavigation model
-                ]
-            , div [ row, class "flex-1 flex-wrap h-screen" ]
+            [ div [ row, class "flex-1 flex-wrap h-screen" ]
                 [ editorHtml
                 , previewHtml
                 ]
@@ -1240,15 +1266,29 @@ view model =
     div [ class "flex justify-center flex-1" ]
         [ case model.route of
             Collection collection ->
-                viewDocuments collection model
+                viewList collection model
 
-            CollectionItem _ key _ ->
-                Maybe.map2
-                    (viewDocumentSource model)
-                    (Dict.get key model.documentSources)
-                    (Dict.get key model.processedDocuments)
-                    |> Maybe.withDefault (div [] [ text <| "No document #" ++ key ])
-
+            CollectionItem collection key _ ->
+                let
+                    documentView =
+                        Maybe.map2
+                            (viewDocumentSource model)
+                            (Dict.get key model.documentSources)
+                            (Dict.get key model.processedDocuments)
+                            |> Maybe.withDefault (div [] [ text <| "No document #" ++ key ])
+                    
+                    listView =
+                        div [ class "w-1/5" ]
+                            [ div [ class "fixed w-1/5 h-full" ]
+                                [ viewCollectionSummary collection
+                                , viewListInner collection model (Just key)
+                                ]
+                            ]
+                in
+                    div [ row, class "flex-1" ]
+                        [ listView
+                        , documentView
+                        ]
             _ ->
                 div [ col, class "flex flex-row flex-1 max-w-lg p-4 text-center text-grey-darkest" ]
                     [ h1 [ class "mb-2 text-center" ]
