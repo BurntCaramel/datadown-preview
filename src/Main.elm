@@ -310,7 +310,7 @@ init flags location =
                       , ( "4-images", Samples.Images.source )
                       , ( "5-api", Samples.API.source )
                       , ( "6-user-profile", Samples.UserProfile.source )
-                      , ( "7-now-try", "# Now your turn!" )
+                      , ( "7-now-you", "# Now your turn!" )
                       ]
                         |> Dict.fromList
                     , []
@@ -1242,7 +1242,7 @@ viewDocumentSource model documentSource resolvedDocument =
 
                 _ ->
                     div [ class "flex-1 min-w-full md:min-w-0" ]
-                        [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-indigo-lightest", rows 20 ] []
+                        [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-blue-lightest", rows 20 ] []
                         ]
 
         previewHtml =
