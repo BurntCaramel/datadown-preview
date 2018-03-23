@@ -835,6 +835,16 @@ viewContent options content =
         Text s ->
             div [ class "font-sans w-full" ] (Preview.Decorate.view s)
 
+        Code (Just "graphql") query ->
+            let
+                rpc =
+                    Datadown.Rpc.graphQL query
+            in
+                div []
+                    [ viewCode options (Just "graphql") query
+                    , viewRpc rpc (options.getRpcResponse rpc.id)
+                    ]
+
         Code language source ->
             viewCode options language source
 

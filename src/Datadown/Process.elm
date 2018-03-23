@@ -457,6 +457,13 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                             Err error ->
                                 Err error
 
+                Code (Just "graphql") graphqlSource ->
+                    let
+                        rpc =
+                            Rpc.graphQL graphqlSource
+                    in
+                        Ok ( content, [ rpc ] )
+
                 Code (Just "json") jsonSource ->
                     let
                         jsonResult =
