@@ -1373,7 +1373,12 @@ viewDocumentPreview model resolved =
 
                 Nothing ->
                     text ""
-            , viewMutationHistory model.mutationHistory
+            , case maybeMutationModel of
+                Just mutationModel ->
+                    viewMutationHistory model.mutationHistory
+                
+                Nothing ->
+                    text ""
             , div [ class "pr-4" ] sectionsHtml
             ]
 
