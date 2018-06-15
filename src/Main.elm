@@ -1164,13 +1164,15 @@ viewCollectionSummary collection =
         message =
             case collection of
                 GitHubRepo owner repoName branch ->
-                    "@" ++ owner ++ "/" ++ repoName ++ "/" ++ branch ++ " from GitHub"
+                    span [ class "font-sm" ]
+                        [ text <| "@" ++ owner ++ " " ++ repoName ++ " " ++ branch ++ " from GitHub"
+                        ]
 
                 Example ->
-                    "Example"
+                    text "Example"
     in
         div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
-            [ h2 [ class "text-white" ] [ text message ]
+            [ h2 [ class "text-white" ] [ message ]
             ]
 
 
