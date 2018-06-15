@@ -13,6 +13,8 @@ source =
 
 ### editedBody: `String`
 
+### editsCount: `Int`
+
 
 ## Mutation
 
@@ -30,6 +32,10 @@ Hello world
 
 ### editing
 `.false`
+
+### editsCount
+
+0
 
 
 ## Update
@@ -52,6 +58,9 @@ Hello world
 
 #### editedBody
 `.empty`
+
+#### editsCount
+`$editsCount + 1`
 
 ### discardEditing
 

@@ -1216,14 +1216,17 @@ viewQueryField field =
         , dd []
             [ case field.value of
                 QueryModel.StringValue s ->
-                    textarea [ value s, class "border full-width" ] []
+                    div [ class "p-1 bg-grey-lighter" ] [ text s ]
 
                 QueryModel.BoolValue b ->
-                    input
-                        [ type_ "checkbox"
-                        , checked b
-                        ]
-                        []
+                    div
+                        [ class "italic" ]
+                        [ text (if b then "true" else "false") ]
+                
+                QueryModel.IntValue i ->
+                    div
+                        [ class "italic" ]
+                        [ text (toString i) ]
 
                 _ ->
                     text ""

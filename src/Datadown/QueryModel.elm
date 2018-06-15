@@ -24,17 +24,20 @@ import Regex
 import JsonValue exposing (JsonValue)
 import Datadown exposing (Content(..))
 import Datadown.Process exposing (ResolvedSection(..))
+import Datadown.Expressions exposing (parseExpression, evaluateAsInt)
 
 
 type FieldKind
     = String
     | Bool
+    | Int
     | Query
 
 
 type FieldValue
     = StringValue String
     | BoolValue Bool
+    | IntValue Int
     | QueryValue
 
 
@@ -58,6 +61,9 @@ defaultValueForKind kind =
 
         Bool ->
             BoolValue False
+        
+        Int ->
+            IntValue 0
 
         Query ->
             QueryValue
@@ -89,6 +95,9 @@ parseFieldDefinition ( rawTitle, _ ) =
 
                         "String" ->
                             Just String
+                        
+                        "Int" ->
+                            Just Int
 
                         _ ->
                             Nothing
@@ -124,6 +133,38 @@ parseQueryModel sectionWrapper =
     in
         QueryModel fields
 
+
+resolveExpression : (String -> Maybe FieldDefinition) -> FieldKind -> String -> Maybe FieldValue
+resolveExpression sourceFieldWithName kind expressionSource =
+    let
+        resolveIdentifier identifier =
+            case sourceFieldWithName identifier of
+                Just field ->
+                    case field.value of
+                        IntValue i ->
+                            Just i
+
+                        _ ->
+                            Nothing
+                
+                Nothing ->
+                    Nothing
+
+        exp =
+            expressionSource
+                |> parseExpression
+        
+        maybeInt =
+            exp
+                |> Result.toMaybe
+                |> Maybe.andThen (evaluateAsInt resolveIdentifier >> Result.toMaybe)
+    in
+        case kind of
+            Int ->
+                Maybe.map IntValue maybeInt
+            
+            _ ->
+                Nothing
 
 applyValuesToModel : (Content a -> Result e JsonValue) -> ResolvedSection e a -> QueryModel -> QueryModel
 applyValuesToModel contentToJson sectionWrapper model =
@@ -186,6 +227,9 @@ applyValuesToModel contentToJson sectionWrapper model =
 
                 ( Bool, (JsonValue.StringValue ".true") :: [] ) ->
                     Just <| BoolValue True
+
+                ( kind, (JsonValue.StringValue s) :: [] ) ->
+                    resolveExpression sourceFieldWithName kind s
 
                 _ ->
                     Nothing
