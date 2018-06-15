@@ -3,11 +3,13 @@ module Datadown.Expressions exposing (ParseError, EvaluateError, parseExpression
 import Char
 import Parser exposing (..)
 
-type Operator =
-    Add
 
-type Token =
-    Identifier String
+type Operator
+    = Add
+
+
+type Token
+    = Identifier String
     | IntLiteral Int
     | BoolLiteral Bool
     | Operator Operator
@@ -127,29 +129,29 @@ type ParseError
 
 parseNext : Expression -> List Token -> Result ParseError Expression
 parseNext left tokens =
-    case (left, tokens) of
-        (Empty, []) ->
+    case ( left, tokens ) of
+        ( Empty, [] ) ->
             Err CannotBeEmpty
-        
-        (left, []) ->
+
+        ( left, [] ) ->
             Ok left
-        
-        (Empty, Identifier id :: rest) ->
+
+        ( Empty, (Identifier id) :: rest ) ->
             parseNext (ReadInt id |> Int) rest
-        
-        (Empty, IntLiteral i :: rest) ->
+
+        ( Empty, (IntLiteral i) :: rest ) ->
             parseNext (UseInt i |> Int) rest
-        
-        (Empty, BoolLiteral b :: rest) ->
+
+        ( Empty, (BoolLiteral b) :: rest ) ->
             parseNext (UseBool b |> Bool) rest
-        
-        (Empty, Operator op :: rest) ->
+
+        ( Empty, (Operator op) :: rest ) ->
             Err <| OperatorCannotBeFirst op rest
 
-        (left, Operator op :: []) ->
+        ( left, (Operator op) :: [] ) ->
             Err <| OperatorMissingRight left op
-        
-        (Int left, Operator op :: rest) ->
+
+        ( Int left, (Operator op) :: rest ) ->
             let
                 rightResult =
                     parseNext Empty rest
@@ -160,14 +162,14 @@ parseNext left tokens =
 
                     Ok right ->
                         Err <| OperatorMustHaveNumericRight (Int left) op right
-                    
+
                     Err error ->
                         Err error
 
-        (left, Operator op :: rest) ->
+        ( left, (Operator op) :: rest ) ->
             Err <| OperatorMustHaveNumericLeft left op
-        
-        (left, tokens) ->
+
+        ( left, tokens ) ->
             Err <| Invalid left tokens
 
 
@@ -196,13 +198,13 @@ evaluateIntExpression resolveIdentifier expression =
             case resolveIdentifier id of
                 Just i ->
                     Ok i
-                
+
                 Nothing ->
                     Err (ValueForIdentifierMustBeInt id)
-        
+
         UseInt i ->
             Ok i
-        
+
         IntOperator left Add right ->
             Result.map2 (+)
                 (evaluateIntExpression resolveIdentifier left)

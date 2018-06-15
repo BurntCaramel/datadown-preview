@@ -61,7 +61,7 @@ defaultValueForKind kind =
 
         Bool ->
             BoolValue False
-        
+
         Int ->
             IntValue 0
 
@@ -95,7 +95,7 @@ parseFieldDefinition ( rawTitle, _ ) =
 
                         "String" ->
                             Just String
-                        
+
                         "Int" ->
                             Just Int
 
@@ -146,14 +146,14 @@ resolveExpression sourceFieldWithName kind expressionSource =
 
                         _ ->
                             Nothing
-                
+
                 Nothing ->
                     Nothing
 
         exp =
             expressionSource
                 |> parseExpression
-        
+
         maybeInt =
             exp
                 |> Result.toMaybe
@@ -162,9 +162,10 @@ resolveExpression sourceFieldWithName kind expressionSource =
         case kind of
             Int ->
                 Maybe.map IntValue maybeInt
-            
+
             _ ->
                 Nothing
+
 
 applyValuesToModel : (Content a -> Result e JsonValue) -> ResolvedSection e a -> QueryModel -> QueryModel
 applyValuesToModel contentToJson sectionWrapper model =

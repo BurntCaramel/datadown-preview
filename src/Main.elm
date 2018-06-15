@@ -1221,8 +1221,14 @@ viewQueryField field =
                 QueryModel.BoolValue b ->
                     div
                         [ class "italic" ]
-                        [ text (if b then "true" else "false") ]
-                
+                        [ text
+                            (if b then
+                                "true"
+                             else
+                                "false"
+                            )
+                        ]
+
                 QueryModel.IntValue i ->
                     div
                         [ class "italic" ]
@@ -1241,6 +1247,18 @@ viewMutationField field =
         , onClick (RunMutation field.name)
         ]
         [ text (field.name) ]
+
+
+viewMutationHistory : List String -> Html Message
+viewMutationHistory mutationNames =
+    details [ class "mb-8", open True ]
+        [ summary [] [ text "Mutation history" ]
+        , ol []
+            (mutationNames
+                |> List.map (text >> List.singleton >> li [])
+                |> List.reverse
+            )
+        ]
 
 
 specialSectionTitles : Set String
@@ -1355,6 +1373,7 @@ viewDocumentPreview model resolved =
 
                 Nothing ->
                     text ""
+            , viewMutationHistory model.mutationHistory
             , div [ class "pr-4" ] sectionsHtml
             ]
 
