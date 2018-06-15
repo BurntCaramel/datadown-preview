@@ -2,18 +2,21 @@ module Main exposing (main)
 
 import Html exposing (..)
 import Navigation exposing (Location)
-import Html.Attributes exposing (class, id, rows, attribute, value, type_, placeholder, disabled, href, style)
+import Html.Attributes exposing (class, id, rows, attribute, value, checked, type_, placeholder, disabled, href, style)
 import Html.Events exposing (onInput, onCheck, onClick)
 import Time exposing (Time)
 import Date
 import Dict exposing (Dict)
+import Set exposing (Set)
 import Task
 import Http
 import Routes exposing (Route(..), CollectionSource(..), EditMode(..))
-import Datadown exposing (Document, Section(..), Content(..))
+import Datadown exposing (Document, Section(..), Content(..), sectionHasTitle)
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
 import Datadown.Rpc exposing (Rpc)
+import Datadown.QueryModel as QueryModel
+import Datadown.MutationModel as MutationModel
 import JsonValue exposing (JsonValue(..))
 import Parser exposing (Error)
 import Preview
@@ -27,6 +30,7 @@ import Samples.Button
 import Samples.Images
 import Samples.API
 import Samples.UserProfile
+import Samples.WikiModel
 import Services.CollectedSource
 
 
@@ -48,6 +52,7 @@ type alias Model =
     , now : Time
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
+    , mutationHistory : List String
     }
 
 
@@ -125,7 +130,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
             case resolveFromDocument key of
                 Ok value ->
                     Ok value
-                
+
                 Err error ->
                     case builtInValueFromModel model key of
                         Just value ->
@@ -142,7 +147,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
 
                 Just value ->
                     Ok value
-                
+
                 Nothing ->
                     defaultResolveWithModel key
     in
@@ -271,6 +276,20 @@ modelWithCurrentDocumentProcessed model =
             model
 
 
+exampleDocumentSources : Dict String String
+exampleDocumentSources =
+    [ ( "1-welcome", Samples.Welcome.source )
+    , ( "2-clock", Samples.Clock.source )
+    , ( "3-button", Samples.Button.source )
+    , ( "4-images", Samples.Images.source )
+    , ( "5-api", Samples.API.source )
+    , ( "6-user-profile", Samples.UserProfile.source )
+    , ( "7-wiki-model", Samples.WikiModel.source )
+    , ( "8-now-you", "# Now your turn!" )
+    ]
+        |> Dict.fromList
+
+
 init : Flags -> Location -> ( Model, Cmd Message )
 init flags location =
     let
@@ -304,15 +323,7 @@ init flags location =
                     ( Dict.singleton
                         (Example |> Routes.collectionSourceToId)
                         Loaded
-                    , [ ( "1-welcome", Samples.Welcome.source )
-                      , ( "2-clock", Samples.Clock.source )
-                      , ( "3-button", Samples.Button.source )
-                      , ( "4-images", Samples.Images.source )
-                      , ( "5-api", Samples.API.source )
-                      , ( "6-user-profile", Samples.UserProfile.source )
-                      , ( "7-now-you", "# Now your turn!" )
-                      ]
-                        |> Dict.fromList
+                    , exampleDocumentSources
                     , []
                     )
 
@@ -328,6 +339,7 @@ init flags location =
             , now = 0
             , sectionInputs = Dict.empty
             , rpcResponses = Dict.empty
+            , mutationHistory = []
             }
                 |> case route of
                     CollectionItem _ key _ ->
@@ -353,6 +365,7 @@ type Message
     | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
     | LoadedGitHubComponents String String String (Result Http.Error (List Services.CollectedSource.ContentInfo))
+    | RunMutation String
 
 
 update : Message -> Model -> ( Model, Cmd Message )
@@ -685,7 +698,12 @@ update msg model =
 
                 Err error ->
                     Debug.crash "Error!"
-                    -- model ! []
+
+        RunMutation name ->
+            { model
+                | mutationHistory = name :: model.mutationHistory
+            }
+                ! []
 
 
 subscriptions : Model -> Sub Message
@@ -751,13 +769,13 @@ viewCode options maybeLanguage source =
             case maybeLanguage of
                 Just "html" ->
                     options.baseHtmlSource
-                
+
                 _ ->
                     ""
 
         maybePreviewHtml =
             Preview.view maybeLanguage (sourcePrefix ++ "\n" ++ source)
-        
+
         sourceIsOpen =
             maybePreviewHtml == Nothing
     in
@@ -919,17 +937,17 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
             []
         else if showEditor then
             let
-                (baseTitle, kind) =
+                ( baseTitle, kind ) =
                     case String.split ":" sectionTitle of
                         head :: second :: rest ->
                             ( head, String.trim second )
-                        
+
                         head :: [] ->
                             ( head, "text" )
 
                         [] ->
                             ( "", "" )
-                
+
                 isSingular =
                     kind == "text"
 
@@ -966,7 +984,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                         |> List.filterMap (Result.toMaybe)
                         |> List.filterMap (options.contentToJson >> Result.toMaybe)
                         |> List.concatMap jsonToStrings
-                
+
                 choiceCount =
                     List.length defaultValues
 
@@ -989,7 +1007,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
 
                 hasSubsections =
                     not <| List.isEmpty subsections
-                
+
                 optionHtmlFor string =
                     option [ value string ] [ text string ]
             in
@@ -1021,7 +1039,7 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                             case kind of
                                 "number" ->
                                     1
-                                
+
                                 _ ->
                                     3
                     in
@@ -1034,8 +1052,6 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
                             ]
                             []
                         ]
-                    
-                    
         else
             contentResults
                 |> List.map (viewContentResult options)
@@ -1068,7 +1084,7 @@ viewSectionTitle level =
             h4 [ class "mb-2 text-base text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
         _ ->
-            h4 [ class "mb-2 text-sm text-blue-dark cursor-pointer summary-indicator-absolute" ]
+            h5 [ class "mb-2 text-sm text-blue-dark cursor-pointer summary-indicator-absolute" ]
 
 
 viewSection : List String -> DisplayOptions -> SectionViewModel (Process.Error Evaluate.Error) -> Html Message
@@ -1095,7 +1111,8 @@ viewFontAwesomeIcon id =
 
 viewDocumentNavigation : Model -> Html Message
 viewDocumentNavigation model =
-    div [ class "h-8 bg-indigo-darkest"
+    div
+        [ class "h-8 bg-indigo-darkest"
         ]
         [ case model.route of
             Collection collection ->
@@ -1125,7 +1142,7 @@ viewListInner collection model activeKey =
                     [ class "w-full px-4 py-2 text-left text-lg font-bold cursor-default"
                     , if Just key == activeKey then
                         class "text-indigo-darkest bg-blue-light"
-                    else
+                      else
                         class "text-white bg-indigo-darkest"
                     , onClick (GoToDocumentWithKey collection key)
                     ]
@@ -1191,6 +1208,43 @@ processDocumentWithModel model document =
     processDocument (evaluateExpressions model) (contentToJson model) document
 
 
+viewQueryField : QueryModel.FieldDefinition -> Html Message
+viewQueryField field =
+    dl
+        []
+        [ dt [ class "font-bold" ] [ text field.name ]
+        , dd []
+            [ case field.value of
+                QueryModel.StringValue s ->
+                    textarea [ value s, class "border full-width" ] []
+
+                QueryModel.BoolValue b ->
+                    input
+                        [ type_ "checkbox"
+                        , checked b
+                        ]
+                        []
+
+                _ ->
+                    text ""
+            ]
+        ]
+
+
+viewMutationField : QueryModel.FieldDefinition -> Html Message
+viewMutationField field =
+    button
+        [ class "px-2 py-1 mb-1 text-blue border border-blue"
+        , onClick (RunMutation field.name)
+        ]
+        [ text (field.name) ]
+
+
+specialSectionTitles : Set String
+specialSectionTitles =
+    Set.fromList [ "Query", "Mutation" ]
+
+
 viewDocumentPreview : Model -> Resolved Evaluate.Error Expressions -> Html Message
 viewDocumentPreview model resolved =
     let
@@ -1210,8 +1264,62 @@ viewDocumentPreview model resolved =
         sectionsHtml : List (Html Message)
         sectionsHtml =
             resolved.sections
+                |> List.filter (\( title, _ ) -> not <| Set.member title specialSectionTitles)
                 |> List.map makeSectionViewModel
                 |> List.map (viewSection [] displayOptions)
+
+        sectionWithTitle titleToFind =
+            resolved.sections
+                |> List.filter (\( title, _ ) -> title == titleToFind)
+                |> List.head
+                |> Maybe.map Tuple.second
+
+        maybeQueryModel =
+            sectionWithTitle "Query"
+                |> Maybe.map QueryModel.parseQueryModel
+
+        maybeQueryModelWithValues =
+            case ( maybeQueryModel, sectionWithTitle "Initial" ) of
+                ( Just queryModel, Just initialSection ) ->
+                    queryModel
+                        |> QueryModel.applyValuesToModel (contentToJson model >> Result.mapError Process.Evaluate) initialSection
+                        |> Just
+
+                ( Just queryModel, Nothing ) ->
+                    Just queryModel
+
+                _ ->
+                    Nothing
+
+        maybeQueryModelWithMutations =
+            case ( maybeQueryModelWithValues, sectionWithTitle "Update" ) of
+                ( Just queryModel, Just (ResolvedSection updateSection) ) ->
+                    let
+                        applyValuesToModel =
+                            QueryModel.applyValuesToModel (contentToJson model >> Result.mapError Process.Evaluate)
+
+                        mutationSectionWithName nameToFind =
+                            updateSection.subsections
+                                |> List.filter (\( title, subsection ) -> title == nameToFind)
+                                |> List.head
+                                |> Maybe.map Tuple.second
+
+                        applyMutation name queryModel =
+                            case mutationSectionWithName name of
+                                Just mutationSection ->
+                                    applyValuesToModel mutationSection queryModel
+
+                                Nothing ->
+                                    queryModel
+                    in
+                        Just <| List.foldr applyMutation queryModel model.mutationHistory
+
+                _ ->
+                    maybeQueryModel
+
+        maybeMutationModel =
+            sectionWithTitle "Mutation"
+                |> Maybe.map MutationModel.parseMutationModel
 
         introHtml : List (Html Message)
         introHtml =
@@ -1230,6 +1338,20 @@ viewDocumentPreview model resolved =
                 [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text resolved.title ]
                 ]
             , div [ class "pr-4" ] introHtml
+            , case maybeQueryModelWithMutations of
+                Just queryModel ->
+                    div [ col, class "mb-4 mr-4" ]
+                        (List.map viewQueryField queryModel.fields)
+
+                Nothing ->
+                    text ""
+            , case maybeMutationModel of
+                Just mutationModel ->
+                    div [ col, class "mb-4 mr-4" ]
+                        (List.map viewMutationField mutationModel.fields)
+
+                Nothing ->
+                    text ""
             , div [ class "pr-4" ] sectionsHtml
             ]
 
@@ -1278,7 +1400,7 @@ view model =
                             (Dict.get key model.documentSources)
                             (Dict.get key model.processedDocuments)
                             |> Maybe.withDefault (div [] [ text <| "No document #" ++ key ])
-                    
+
                     listView =
                         div [ class "w-1/5" ]
                             [ div [ class "fixed w-1/5 h-full" ]
@@ -1291,6 +1413,7 @@ view model =
                         [ listView
                         , documentView
                         ]
+
             _ ->
                 div [ col, class "flex flex-row flex-1 max-w-lg p-4 text-center text-grey-darkest" ]
                     [ h1 [ class "mb-2 text-center" ]

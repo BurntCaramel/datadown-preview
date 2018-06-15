@@ -58,15 +58,15 @@ fromPath path =
         case segments of
             [] ->
                 Landing
-            
+
             "example" :: rest ->
                 case rest of
                     [] ->
                         Collection Example
-                    
+
                     items ->
                         CollectionItem Example (String.join "/" items) WithPreview
-            
+
             "github" :: owner :: repo :: ref :: rest ->
                 let
                     collection =
@@ -75,7 +75,7 @@ fromPath path =
                     case rest of
                         [] ->
                             Collection collection
-                        
+
                         items ->
                             CollectionItem collection (String.join "/" items) WithPreview
 

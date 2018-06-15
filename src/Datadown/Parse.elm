@@ -95,6 +95,33 @@ processContentBlock parseExpressions block =
                 Nothing
 
 
+addContentToSection : Content a -> List ( String, a ) -> List String -> Section a -> Section a
+addContentToSection content expressions urls section =
+    case section of
+        Section sectionRecord ->
+            case sectionRecord.subsections of
+                [] ->
+                    Section
+                        { sectionRecord
+                            | mainContent = content :: sectionRecord.mainContent
+                            , inlineExpressions = Dict.union sectionRecord.inlineExpressions (Dict.fromList expressions)
+                            , urls = List.append sectionRecord.urls urls
+                        }
+
+                subsection :: subsectionsTail ->
+                    let
+                        updatedSubsection =
+                            addContentToSection content expressions urls subsection
+
+                        newSection =
+                            Section
+                                { sectionRecord
+                                    | subsections = updatedSubsection :: subsectionsTail
+                                }
+                    in
+                        newSection
+
+
 addContentToDocument : Content a -> List ( String, a ) -> List String -> Document a -> Document a
 addContentToDocument content expressions urls document =
     case document.sections of
@@ -104,41 +131,37 @@ addContentToDocument content expressions urls document =
                 , introInlineExpressions = Dict.union document.introInlineExpressions (Dict.fromList expressions)
             }
 
-        (Section sectionRecord) :: sectionsTail ->
-            case sectionRecord.subsections of
-                [] ->
-                    let
-                        newSection =
-                            Section
-                                { sectionRecord
-                                    | mainContent = content :: sectionRecord.mainContent
-                                    , inlineExpressions = Dict.union sectionRecord.inlineExpressions (Dict.fromList expressions)
-                                    , urls = List.append sectionRecord.urls urls
-                                }
-                    in
-                        { document
-                            | sections = newSection :: sectionsTail
-                        }
+        section :: sectionsTail ->
+            let
+                updatedSection =
+                    addContentToSection content expressions urls section
+            in
+                { document
+                    | sections = updatedSection :: sectionsTail
+                }
 
-                (Section subsectionRecord) :: subsectionsTail ->
-                    let
-                        newSubsection =
-                            Section
-                                { subsectionRecord
-                                    | mainContent = content :: subsectionRecord.mainContent
-                                    , inlineExpressions = Dict.union subsectionRecord.inlineExpressions (Dict.fromList expressions)
-                                    , urls = List.append subsectionRecord.urls urls
-                                }
 
-                        newSection =
-                            Section
-                                { sectionRecord
-                                    | subsections = newSubsection :: subsectionsTail
-                                }
-                    in
-                        { document
-                            | sections = newSection :: sectionsTail
-                        }
+addSubsectionTo : Int -> Section a -> List (Section a) -> List (Section a)
+addSubsectionTo depthRemaining newSection sections =
+    if depthRemaining == 0 then
+        newSection :: sections
+    else
+        case sections of
+            [] ->
+                sections
+
+            (Section section) :: sectionsTail ->
+                let
+                    updatedSubsections =
+                        addSubsectionTo (depthRemaining - 1) newSection section.subsections
+
+                    updatedSection =
+                        Section
+                            { section
+                                | subsections = updatedSubsections
+                            }
+                in
+                    updatedSection :: sectionsTail
 
 
 addSubsectionToDocument : Section a -> Document a -> Document a
@@ -149,14 +172,14 @@ addSubsectionToDocument subsection document =
 
         (Section section) :: sectionsTail ->
             let
-                newSection =
+                updatedSection =
                     Section
                         { section
                             | subsections = subsection :: section.subsections
                         }
             in
                 { document
-                    | sections = newSection :: sectionsTail
+                    | sections = updatedSection :: sectionsTail
                 }
 
 
@@ -177,27 +200,23 @@ parseMarkdownBlock parseExpressions block document =
         Heading text 1 inlines ->
             { document | title = Inline.extractText inlines }
 
-        Heading text 2 inlines ->
+        Heading text level inlines ->
             let
                 title : String
                 title =
                     inlines
                         |> Inline.extractText
                         |> String.trim
+
+                newSection =
+                    sectionWithTitle title
+
+                updatedSections =
+                    addSubsectionTo (level - 2) newSection document.sections
             in
                 { document
-                    | sections = (sectionWithTitle title) :: document.sections
+                    | sections = updatedSections
                 }
-
-        Heading text 3 inlines ->
-            let
-                title : String
-                title =
-                    inlines
-                        |> Inline.extractText
-                        |> String.trim
-            in
-                addSubsectionToDocument (sectionWithTitle title) document
 
         Block.List listBlock items ->
             let

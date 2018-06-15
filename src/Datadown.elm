@@ -4,6 +4,7 @@ module Datadown
         , Section(..)
         , Content(..)
         , ListItemQualifier(..)
+        , sectionHasTitle
         )
 
 {-| A library for Datadown parsing
@@ -47,6 +48,13 @@ type Section a
         , inlineExpressions : Dict String a
         , urls : List String
         }
+
+
+sectionHasTitle : String -> Section a -> Bool
+sectionHasTitle title sectionWrapper =
+    case sectionWrapper of
+        Section section ->
+            section.title == title
 
 
 {-| A full document, with many sections

@@ -10,7 +10,7 @@ module Datadown.Rpc
         , errorToJsonValue
         )
 
-{-| Commands
+{-| Rpc
 
 
 ## Types
@@ -110,7 +110,7 @@ graphQL : String -> Rpc
 graphQL queryString =
     let
         params =
-            [ ("query", JsonValue.StringValue queryString)
+            [ ( "query", JsonValue.StringValue queryString )
             ]
                 |> JsonValue.ObjectValue
     in
@@ -183,12 +183,12 @@ toCommand toMessage rpc =
             let
                 maybeQuery =
                     getParam [ "query" ] rpc
-                
+
                 url =
                     case getParam [ "url" ] rpc of
                         Just (JsonValue.StringValue s) ->
                             s
-                        
+
                         _ ->
                             "https://1.source.collected.design/graphql"
             in

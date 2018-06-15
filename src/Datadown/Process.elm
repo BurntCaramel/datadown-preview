@@ -339,29 +339,28 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                     case String.split ":" fullKey of
                                         baseKey :: kind :: [] ->
                                             Just baseKey
-                                        
+
                                         baseKey :: [] ->
                                             Just baseKey
 
                                         _ ->
                                             Nothing
                             in
-                                
-                            case maybeBaseKey of
-                                Just baseKey ->
-                                    if baseKey == firstKey then
-                                        case record.mainContent of
-                                            [] ->
-                                                otherKeys
-                                                    |> contentForKeyPathInResolvedSections record.subsections
+                                case maybeBaseKey of
+                                    Just baseKey ->
+                                        if baseKey == firstKey then
+                                            case record.mainContent of
+                                                [] ->
+                                                    otherKeys
+                                                        |> contentForKeyPathInResolvedSections record.subsections
 
-                                            _ ->
-                                                Just (List.concatMap resolveContentResult record.mainContent)
-                                    else
+                                                _ ->
+                                                    Just (List.concatMap resolveContentResult record.mainContent)
+                                        else
+                                            Nothing
+
+                                    Nothing ->
                                         Nothing
-
-                                Nothing ->
-                                    Nothing
 
                 findInSections resolvedSections =
                     case resolvedSections of
