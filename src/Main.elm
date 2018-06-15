@@ -1354,7 +1354,7 @@ viewDocumentPreview model resolved =
                 resolved.intro
                 []
     in
-        div [ class "flex-1 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
+        div [ class "w-1/2 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
             [ div [ row, class "mb-4" ]
                 [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text resolved.title ]
                 ]
@@ -1388,7 +1388,7 @@ viewDocumentSource model documentSource resolvedDocument =
 
                 _ ->
                     div [ class "flex-1 min-w-full md:min-w-0" ]
-                        [ textarea [ value documentSource, onInput ChangeDocumentSource, class "flex-1 w-full min-h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-blue-lightest", rows 20 ] []
+                        [ textarea [ value documentSource, onInput ChangeDocumentSource, class "fixed flex-1 w-2/5 h-full overflow-auto pt-4 pl-4 font-mono text-sm leading-normal text-indigo-darkest bg-blue-lightest", rows 20 ] []
                         ]
 
         previewHtml =
