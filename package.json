@@ -6,7 +6,7 @@
     "build": "nwb build-web-app && cp src/_redirects dist/_redirects",
     "clean": "nwb clean-app",
     "dev": "nwb serve-web-app --reload",
-    "test": "nwb test",
+    "test": "elm-test && nwb test",
     "test:coverage": "nwb test --coverage",
     "test:watch": "nwb test --server"
   },
@@ -27,6 +27,7 @@
   "dependencies": {},
   "devDependencies": {
     "elm": "^0.18.0",
+    "elm-test": "^0.18.12",
     "elm-webpack-loader": "^4.4.0",
     "nwb": "^0.21.5",
     "tailwind": "^1.0.1",
