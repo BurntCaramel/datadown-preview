@@ -1,4 +1,4 @@
-module Datadown.Expressions exposing (Operator(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), parseExpression, evaluateAsInt)
+module Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
 
 import Char
 import Parser exposing (..)
@@ -7,6 +7,16 @@ import Parser exposing (..)
 type Operator
     = Add
     | Multiply
+
+
+precendenceOfOperator : Operator -> Int
+precendenceOfOperator op =
+    case op of
+        Multiply ->
+            2
+        
+        Add ->
+            1
 
 
 type Token
@@ -153,13 +163,19 @@ parseNext left tokens =
 
         ( left, (Operator op) :: [] ) ->
             Err <| OperatorMissingRight left op
-
+        
         ( Int left, (Operator op) :: rest ) ->
             let
                 rightResult =
                     parseNext Empty rest
             in
                 case rightResult of
+                    Ok (Int (IntOperator second nextOp third)) ->
+                        if (precendenceOfOperator op) > (precendenceOfOperator nextOp) then
+                            Ok <| Int <| IntOperator (IntOperator left op second) nextOp third
+                        else
+                            Ok <| Int <| IntOperator left op (IntOperator second nextOp third)
+                    
                     Ok (Int right) ->
                         Ok <| Int <| IntOperator left op right
 
@@ -178,7 +194,9 @@ parseNext left tokens =
 
 parseTokens : List Token -> Result ParseError Expression
 parseTokens tokens =
-    parseNext Empty tokens
+    tokens
+        -- |> List.reverse
+        |> parseNext Empty
 
 
 parseExpression : String -> Result ParseError Expression
@@ -212,7 +230,7 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (+)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
-        
+
         IntOperator left Multiply right ->
             Result.map2 (*)
                 (evaluateIntExpression resolveIdentifier left)

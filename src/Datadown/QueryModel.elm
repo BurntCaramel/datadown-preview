@@ -29,7 +29,7 @@ import Datadown.Expressions exposing (parseExpression, evaluateAsInt)
 
 
 type alias StringFieldConstraints =
-    { choices : Maybe (List String) 
+    { choices : Maybe (List String)
     }
 
 
@@ -99,8 +99,8 @@ contentListToJsonList contentToJson contentList =
 
 jsonListToStringListHelper : JsonValue -> Maybe (List String) -> Maybe (List String)
 jsonListToStringListHelper jsonList maybeStringList =
-    case (jsonList, maybeStringList) of
-        (JsonValue.StringValue s, Just stringList) ->
+    case ( jsonList, maybeStringList ) of
+        ( JsonValue.StringValue s, Just stringList ) ->
             Just (s :: stringList)
 
         _ ->
@@ -112,7 +112,7 @@ jsonListToStringList jsonList =
     List.foldr jsonListToStringListHelper (Just []) jsonList
 
 
-parseFieldDefinition : (Content a -> Result e JsonValue) -> (String -> Maybe (String, ResolvedSection e a)) -> ( String, ResolvedSection e a ) -> Maybe FieldDefinition
+parseFieldDefinition : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ( String, ResolvedSection e a ) -> Maybe FieldDefinition
 parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrapper ) =
     case String.split ":" rawTitle of
         name :: rawKind :: _ ->
@@ -134,18 +134,18 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
                                     case sectionWrapper of
                                         ResolvedSection section ->
                                             section
-                                
+
                                 jsonList =
                                     contentListToJsonList contentToJson section.mainContent
-                                
+
                                 maybeChoices =
                                     case jsonList of
-                                        JsonValue.ArrayValue items :: [] ->
+                                        (JsonValue.ArrayValue items) :: [] ->
                                             jsonListToStringList items
-                                        
+
                                         _ ->
                                             Nothing
-                                
+
                                 constraints =
                                     maybeChoices
                                         |> StringFieldConstraints
@@ -154,12 +154,12 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
 
                         "Int" ->
                             Just Int
-                        
+
                         customType ->
                             let
                                 maybeSection =
                                     sectionDefiningType customType
-                                
+
                                 maybeFieldDefinition =
                                     maybeSection
                                         |> Maybe.andThen (parseFieldDefinition contentToJson sectionDefiningType)
@@ -185,7 +185,7 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
             Nothing
 
 
-parseQueryModel : (Content a -> Result e JsonValue) -> (String -> Maybe (String, ResolvedSection e a)) -> ResolvedSection e a -> QueryModel
+parseQueryModel : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ResolvedSection e a -> QueryModel
 parseQueryModel contentToJson sectionDefiningType sectionWrapper =
     let
         section =
@@ -271,7 +271,7 @@ applyValuesToModel contentToJson sectionWrapper model =
                                 Just <| StringValue (Ok <| Just s) constraints
                             else
                                 Just <| StringValue (Err <| NotInChoices s choices) constraints
-                        
+
                         Nothing ->
                             Just <| StringValue (Ok <| Just s) constraints
 

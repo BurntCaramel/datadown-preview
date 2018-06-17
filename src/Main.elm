@@ -1221,7 +1221,7 @@ viewQueryField field =
                     case valueResult of
                         Ok maybeS ->
                             div [ class "p-1 bg-grey-lighter" ] [ text (Maybe.withDefault "" maybeS) ]
-                        
+
                         Err error ->
                             case error of
                                 QueryModel.NotInChoices s choices ->
@@ -1303,15 +1303,15 @@ viewDocumentPreview model resolved =
                 |> List.filter (\( title, _ ) -> title == titleToFind)
                 |> List.head
                 |> Maybe.map Tuple.second
-        
+
         typeNameMatchesTitle typeName title =
             String.startsWith (typeName ++ ":") title
-        
+
         sectionDefiningType typeName =
             resolved.sections
                 |> List.filter (\( title, _ ) -> typeNameMatchesTitle typeName title)
                 |> List.head
-        
+
         contentToJson2 =
             contentToJson model >> Result.mapError Process.Evaluate
 
@@ -1396,7 +1396,7 @@ viewDocumentPreview model resolved =
             , case maybeMutationModel of
                 Just mutationModel ->
                     viewMutationHistory model.mutationHistory
-                
+
                 Nothing ->
                     text ""
             , div [ class "pr-4" ] sectionsHtml

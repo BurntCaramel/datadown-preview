@@ -6,7 +6,8 @@
     "build": "nwb build-web-app && cp src/_redirects dist/_redirects",
     "clean": "nwb clean-app",
     "dev": "nwb serve-web-app --reload",
-    "test": "elm-test && nwb test",
+    "test:elm": "elm-test",
+    "test": "npm run test:elm && nwb test",
     "test:coverage": "nwb test --coverage",
     "test:watch": "nwb test --server"
   },
