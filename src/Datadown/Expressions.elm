@@ -6,7 +6,9 @@ import Parser exposing (..)
 
 type Operator
     = Add
+    | Subtract
     | Multiply
+    | Divide
 
 
 precendenceOfOperator : Operator -> Int
@@ -15,7 +17,13 @@ precendenceOfOperator op =
         Multiply ->
             2
         
+        Divide ->
+            2
+        
         Add ->
+            1
+        
+        Subtract ->
             1
 
 
@@ -62,8 +70,12 @@ operator =
     oneOf
         [ succeed Add
             |. symbol "+"
+        , succeed Subtract
+            |. symbol "-"
         , succeed Multiply
             |. symbol "*"
+        , succeed Divide
+            |. symbol "/"
         ]
 
 
@@ -141,13 +153,13 @@ type ParseError
 
 
 parseNext : Expression -> List Token -> Result ParseError Expression
-parseNext left tokens =
-    case ( left, tokens ) of
+parseNext right tokens =
+    case ( right, tokens ) of
         ( Empty, [] ) ->
             Err CannotBeEmpty
 
-        ( left, [] ) ->
-            Ok left
+        ( right, [] ) ->
+            Ok right
 
         ( Empty, (Identifier id) :: rest ) ->
             parseNext (ReadInt id |> Int) rest
@@ -161,41 +173,37 @@ parseNext left tokens =
         ( Empty, (Operator op) :: rest ) ->
             Err <| OperatorCannotBeFirst op rest
 
-        ( left, (Operator op) :: [] ) ->
-            Err <| OperatorMissingRight left op
+        ( right, (Operator op) :: [] ) ->
+            Err <| OperatorMissingRight right op
         
-        ( Int left, (Operator op) :: rest ) ->
-            let
-                rightResult =
-                    parseNext Empty rest
-            in
-                case rightResult of
-                    Ok (Int (IntOperator second nextOp third)) ->
-                        if (precendenceOfOperator op) > (precendenceOfOperator nextOp) then
-                            Ok <| Int <| IntOperator (IntOperator left op second) nextOp third
-                        else
-                            Ok <| Int <| IntOperator left op (IntOperator second nextOp third)
-                    
-                    Ok (Int right) ->
-                        Ok <| Int <| IntOperator left op right
+        ( Int first, (Operator op) :: rest ) ->
+            case parseNext Empty rest of
+                Ok (Int (IntOperator third nextOp second)) ->
+                    if (precendenceOfOperator nextOp) >= (precendenceOfOperator op) then
+                        Ok <| Int <| IntOperator (IntOperator third nextOp second) op first
+                    else
+                        Ok <| Int <| IntOperator third nextOp (IntOperator second op first)
+                
+                Ok (Int second) ->
+                    Ok <| Int <| IntOperator second op first
 
-                    Ok right ->
-                        Err <| OperatorMustHaveNumericRight (Int left) op right
+                Ok second ->
+                    Err <| OperatorMustHaveNumericRight (Int first) op second
 
-                    Err error ->
-                        Err error
+                Err error ->
+                    Err error
 
-        ( left, (Operator op) :: rest ) ->
-            Err <| OperatorMustHaveNumericLeft left op
+        ( right, (Operator op) :: rest ) ->
+            Err <| OperatorMustHaveNumericLeft right op
 
-        ( left, tokens ) ->
-            Err <| Invalid left tokens
+        ( right, tokens ) ->
+            Err <| Invalid right tokens
 
 
 parseTokens : List Token -> Result ParseError Expression
 parseTokens tokens =
     tokens
-        -- |> List.reverse
+        |> List.reverse
         |> parseNext Empty
 
 
@@ -230,9 +238,19 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (+)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
+        
+        IntOperator left Subtract right ->
+            Result.map2 (-)
+                (evaluateIntExpression resolveIdentifier left)
+                (evaluateIntExpression resolveIdentifier right)
 
         IntOperator left Multiply right ->
             Result.map2 (*)
+                (evaluateIntExpression resolveIdentifier left)
+                (evaluateIntExpression resolveIdentifier right)
+        
+        IntOperator left Divide right ->
+            Result.map2 (//)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
 
