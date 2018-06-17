@@ -1,4 +1,4 @@
-module Datadown.Expressions exposing (ParseError, EvaluateError, parseExpression, evaluateAsInt)
+module Datadown.Expressions exposing (Operator(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), parseExpression, evaluateAsInt)
 
 import Char
 import Parser exposing (..)
@@ -6,6 +6,7 @@ import Parser exposing (..)
 
 type Operator
     = Add
+    | Multiply
 
 
 type Token
@@ -51,6 +52,8 @@ operator =
     oneOf
         [ succeed Add
             |. symbol "+"
+        , succeed Multiply
+            |. symbol "*"
         ]
 
 
@@ -207,6 +210,11 @@ evaluateIntExpression resolveIdentifier expression =
 
         IntOperator left Add right ->
             Result.map2 (+)
+                (evaluateIntExpression resolveIdentifier left)
+                (evaluateIntExpression resolveIdentifier right)
+        
+        IntOperator left Multiply right ->
+            Result.map2 (*)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
 
