@@ -31,6 +31,7 @@ import Samples.Images
 import Samples.API
 import Samples.UserProfile
 import Samples.WikiModel
+import Samples.FileBrowserModel
 import Services.CollectedSource
 
 
@@ -285,7 +286,8 @@ exampleDocumentSources =
     , ( "5-api", Samples.API.source )
     , ( "6-user-profile", Samples.UserProfile.source )
     , ( "7-wiki-model", Samples.WikiModel.source )
-    , ( "8-now-you", "# Now your turn!" )
+    , ( "8-file-browser", Samples.FileBrowserModel.source )
+    , ( "now-you", "# Now your turn!" )
     ]
         |> Dict.fromList
 
@@ -1215,8 +1217,15 @@ viewQueryField field =
         [ dt [ class "font-bold" ] [ text field.name ]
         , dd []
             [ case field.value of
-                QueryModel.StringValue s ->
-                    div [ class "p-1 bg-grey-lighter" ] [ text s ]
+                QueryModel.StringValue valueResult constraints ->
+                    case valueResult of
+                        Ok maybeS ->
+                            div [ class "p-1 bg-grey-lighter" ] [ text (Maybe.withDefault "" maybeS) ]
+                        
+                        Err error ->
+                            case error of
+                                QueryModel.NotInChoices s choices ->
+                                    div [ class "p-1 text-red border-l-4 border-red" ] [ text s ]
 
                 QueryModel.BoolValue b ->
                     div
@@ -1294,16 +1303,27 @@ viewDocumentPreview model resolved =
                 |> List.filter (\( title, _ ) -> title == titleToFind)
                 |> List.head
                 |> Maybe.map Tuple.second
+        
+        typeNameMatchesTitle typeName title =
+            String.startsWith (typeName ++ ":") title
+        
+        sectionDefiningType typeName =
+            resolved.sections
+                |> List.filter (\( title, _ ) -> typeNameMatchesTitle typeName title)
+                |> List.head
+        
+        contentToJson2 =
+            contentToJson model >> Result.mapError Process.Evaluate
 
         maybeQueryModel =
             sectionWithTitle "Query"
-                |> Maybe.map QueryModel.parseQueryModel
+                |> Maybe.map (QueryModel.parseQueryModel contentToJson2 sectionDefiningType)
 
         maybeQueryModelWithValues =
             case ( maybeQueryModel, sectionWithTitle "Initial" ) of
                 ( Just queryModel, Just initialSection ) ->
                     queryModel
-                        |> QueryModel.applyValuesToModel (contentToJson model >> Result.mapError Process.Evaluate) initialSection
+                        |> QueryModel.applyValuesToModel contentToJson2 initialSection
                         |> Just
 
                 ( Just queryModel, Nothing ) ->
@@ -1317,7 +1337,7 @@ viewDocumentPreview model resolved =
                 ( Just queryModel, Just (ResolvedSection updateSection) ) ->
                     let
                         applyValuesToModel =
-                            QueryModel.applyValuesToModel (contentToJson model >> Result.mapError Process.Evaluate)
+                            QueryModel.applyValuesToModel contentToJson2
 
                         mutationSectionWithName nameToFind =
                             updateSection.subsections
