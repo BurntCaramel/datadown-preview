@@ -50,7 +50,7 @@ suite =
                 ]
             ]
         , describe "Parsing"
-            [ describe "parseExpression"
+            [ describe "parseExpression Ok"
                 [ test "1" <|
                     \_ ->
                         parseExpression "1"
@@ -160,6 +160,51 @@ suite =
                                     |> Int
                                     |> Ok
                                 )
+                , test "3 + 1 * 2 * 4 + 5" <|
+                    \_ ->
+                        parseExpression "3 + 1 * 2 * 4 + 5"
+                            |> Expect.equal
+                                (IntOperator
+                                    (IntOperator
+                                        (UseInt 3)
+                                        Add
+                                        (IntOperator
+                                            (IntOperator
+                                                (UseInt 1)
+                                                Multiply
+                                                (UseInt 2)
+                                            )
+                                            Multiply
+                                            (UseInt 4)
+                                        )
+                                    )
+                                    Add
+                                    (UseInt 5)
+                                    |> Int
+                                    |> Ok
+                                )
+                ]
+            ,  describe "parseExpression Err"
+                [ test "+" <|
+                    \_ ->
+                        parseExpression "+"
+                            |> Expect.equal (Err <| OperatorMissingRight Add)
+                , test "1 +" <|
+                    \_ ->
+                        parseExpression "1 +"
+                            |> Expect.equal (Err <| OperatorMissingRight Add)
+                , test "+ 1" <|
+                    \_ ->
+                        parseExpression "+ 1"
+                            |> Expect.equal (Err <| OperatorMissingLeft Add)
+                , test "1 2" <|
+                    \_ ->
+                        parseExpression "1 2"
+                            |> Expect.equal (Err <| Invalid (Int (UseInt 2)) [IntLiteral 1])
+                , test "1 + * 2" <|
+                    \_ ->
+                        parseExpression "1 + * 2"
+                            |> Expect.equal (Err <| OperatorMissingRight Add)
                 ]
             ]
         ]

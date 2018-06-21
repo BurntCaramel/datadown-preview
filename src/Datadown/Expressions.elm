@@ -145,8 +145,8 @@ type Expression
 type ParseError
     = CannotBeEmpty
     | Tokenization Parser.Error
-    | OperatorCannotBeFirst Operator (List Token)
-    | OperatorMissingRight Expression Operator
+    | OperatorMissingLeft Operator
+    | OperatorMissingRight Operator
     | OperatorMustHaveNumericLeft Expression Operator
     | OperatorMustHaveNumericRight Expression Operator Expression
     | Invalid Expression (List Token)
@@ -171,10 +171,10 @@ parseNext right tokens =
             parseNext (UseBool b |> Bool) rest
 
         ( Empty, (Operator op) :: rest ) ->
-            Err <| OperatorCannotBeFirst op rest
+            Err <| OperatorMissingRight op
 
-        ( right, (Operator op) :: [] ) ->
-            Err <| OperatorMissingRight right op
+        ( first, (Operator op) :: [] ) ->
+            Err <| OperatorMissingLeft op
         
         ( Int first, (Operator op) :: rest ) ->
             case parseNext Empty rest of
