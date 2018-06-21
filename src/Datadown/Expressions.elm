@@ -1,6 +1,20 @@
-module Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
+module Datadown.Expressions
+    exposing
+        ( Operator(..)
+        , Url(..)
+        , Token(..)
+        , IntExpression(..)
+        , BoolExpression(..)
+        , Expression(..)
+        , ParseError(..)
+        , EvaluateError(..)
+        , tokenize
+        , parseExpression
+        , evaluateAsInt
+        )
 
 import Char
+import Set exposing (Set)
 import Parser exposing (..)
 
 
@@ -16,15 +30,25 @@ precendenceOfOperator op =
     case op of
         Multiply ->
             2
-        
+
         Divide ->
             2
-        
+
         Add ->
             1
-        
+
         Subtract ->
             1
+
+
+type Url
+    = Https String
+    | Mailto String
+    | Tel String
+    | Math String
+    | Time String
+      -- | Data String String
+    | Other String String
 
 
 type Token
@@ -32,6 +56,7 @@ type Token
     | IntLiteral Int
     | BoolLiteral Bool
     | Operator Operator
+    | Url Url
 
 
 isSpace : Char -> Bool
@@ -79,6 +104,70 @@ operator =
         ]
 
 
+schemeAndStringToUrl : String -> String -> Url
+schemeAndStringToUrl scheme string =
+    case scheme of
+        "https" ->
+            Https string
+
+        "mailto" ->
+            Mailto string
+
+        "tel" ->
+            Tel string
+
+        "math" ->
+            Math string
+
+        "time" ->
+            Time string
+
+        _ ->
+            Other scheme string
+
+
+urlToString : Url -> String
+urlToString url =
+    case url of
+        Https string ->
+            "https:" ++ string
+
+        Mailto email ->
+            "mailto:" ++ email
+
+        Tel phone ->
+            "tel:" ++ phone
+
+        Math string ->
+            "math:" ++ string
+
+        Time string ->
+            "time:" ++ string
+
+        Other scheme string ->
+            scheme ++ ":" ++ string
+
+
+whitespaceChars : Set Char
+whitespaceChars =
+    [ ' ', '\n', '\x0D', '\t' ]
+        |> Set.fromList
+
+
+isNonWhitespace : Char -> Bool
+isNonWhitespace c =
+    Set.member c whitespaceChars
+        |> not
+
+
+url : Parser Token
+url =
+    delayedCommitMap schemeAndStringToUrl
+        (keep oneOrMore Char.isLower |. symbol ":")
+        (keep oneOrMore isNonWhitespace)
+        |> map Url
+
+
 token : Parser Token
 token =
     inContext "token" <|
@@ -92,6 +181,7 @@ token =
                 |. symbol ".true"
             , succeed (BoolLiteral False)
                 |. symbol ".false"
+            , url
             ]
 
 
@@ -175,7 +265,7 @@ parseNext right tokens =
 
         ( first, (Operator op) :: [] ) ->
             Err <| OperatorMissingLeft op
-        
+
         ( Int first, (Operator op) :: rest ) ->
             case parseNext Empty rest of
                 Ok (Int (IntOperator third nextOp second)) ->
@@ -183,7 +273,7 @@ parseNext right tokens =
                         Ok <| Int <| IntOperator (IntOperator third nextOp second) op first
                     else
                         Ok <| Int <| IntOperator third nextOp (IntOperator second op first)
-                
+
                 Ok (Int second) ->
                     Ok <| Int <| IntOperator second op first
 
@@ -238,7 +328,7 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (+)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
-        
+
         IntOperator left Subtract right ->
             Result.map2 (-)
                 (evaluateIntExpression resolveIdentifier left)
@@ -248,7 +338,7 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (*)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
-        
+
         IntOperator left Divide right ->
             Result.map2 (//)
                 (evaluateIntExpression resolveIdentifier left)

@@ -6,7 +6,7 @@ import Expect exposing (Expectation)
 -- import Fuzz exposing (Fuzzer, int, list, string)
 
 import Test exposing (..)
-import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
+import Datadown.Expressions exposing (Operator(..), Url(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
 
 
 suite : Test
@@ -17,35 +17,97 @@ suite =
                 [ test "1" <|
                     \_ ->
                         tokenize "1"
-                            |> Expect.equal (Ok <| [ IntLiteral 1 ])
+                            |> Expect.equal
+                                ([ IntLiteral 1
+                                 ]
+                                    |> Ok
+                                )
                 , test "1 + 2" <|
                     \_ ->
                         tokenize "1 + 2"
-                            |> Expect.equal (Ok <| [ IntLiteral 1, Operator Add, IntLiteral 2 ])
+                            |> Expect.equal
+                                ([ IntLiteral 1
+                                 , Operator Add
+                                 , IntLiteral 2
+                                 ]
+                                    |> Ok
+                                )
                 , test "1 - 2" <|
                     \_ ->
                         tokenize "1 - 2"
-                            |> Expect.equal (Ok <| [ IntLiteral 1, Operator Subtract, IntLiteral 2 ])
+                            |> Expect.equal
+                                ([ IntLiteral 1
+                                 , Operator Subtract
+                                 , IntLiteral 2
+                                 ]
+                                    |> Ok
+                                )
                 , test "2 * 1" <|
                     \_ ->
                         tokenize "2 * 1"
-                            |> Expect.equal (Ok <| [ IntLiteral 2, Operator Multiply, IntLiteral 1 ])
+                            |> Expect.equal
+                                ([ IntLiteral 2
+                                 , Operator Multiply
+                                 , IntLiteral 1
+                                 ]
+                                    |> Ok
+                                )
                 , test "2 / 3" <|
                     \_ ->
                         tokenize "2 / 3"
-                            |> Expect.equal (Ok <| [ IntLiteral 2, Operator Divide, IntLiteral 3 ])
+                            |> Expect.equal
+                                ([ IntLiteral 2
+                                 , Operator Divide
+                                 , IntLiteral 3
+                                 ]
+                                    |> Ok
+                                )
                 , test "2 * 1 + 3" <|
                     \_ ->
                         tokenize "2 * 1 + 3"
-                            |> Expect.equal (Ok <| [ IntLiteral 2, Operator Multiply, IntLiteral 1, Operator Add, IntLiteral 3 ])
+                            |> Expect.equal
+                                ([ IntLiteral 2
+                                 , Operator Multiply
+                                 , IntLiteral 1
+                                 , Operator Add
+                                 , IntLiteral 3
+                                 ]
+                                    |> Ok
+                                )
                 , test "2 + 1 * 3" <|
                     \_ ->
                         tokenize "2 + 1 * 3"
-                            |> Expect.equal (Ok <| [ IntLiteral 2, Operator Add, IntLiteral 1, Operator Multiply, IntLiteral 3 ])
+                            |> Expect.equal
+                                ([ IntLiteral 2
+                                 , Operator Add
+                                 , IntLiteral 1
+                                 , Operator Multiply
+                                 , IntLiteral 3
+                                 ]
+                                    |> Ok
+                                )
                 , test "2 + 1 * 3 / 4" <|
                     \_ ->
                         tokenize "2 + 1 * 3 / 4"
-                            |> Expect.equal (Ok <| [ IntLiteral 2, Operator Add, IntLiteral 1, Operator Multiply, IntLiteral 3, Operator Divide, IntLiteral 4 ])
+                            |> Expect.equal
+                                ([ IntLiteral 2
+                                 , Operator Add
+                                 , IntLiteral 1
+                                 , Operator Multiply
+                                 , IntLiteral 3
+                                 , Operator Divide
+                                 , IntLiteral 4
+                                 ]
+                                    |> Ok
+                                )
+                , test "https://www.example.com/" <|
+                    \_ ->
+                        tokenize "https://www.example.com/"
+                            |> Expect.equal
+                                ([ Url (Https "//www.example.com/")
+                                 ]
+                                    |> Ok
+                                )
                 ]
             ]
         , describe "Parsing"
