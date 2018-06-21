@@ -6,9 +6,11 @@ import Expect exposing (Expectation)
 -- import Fuzz exposing (Fuzzer, int, list, string)
 
 import Test exposing (..)
-import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
+import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt, evaluateAsJson)
 import Datadown.Url exposing (Url(..))
 import Datadown.Procedures exposing (Procedure(..))
+import JsonValue exposing (..)
+import Dict
 
 
 suite : Test
@@ -276,6 +278,81 @@ suite =
                     \_ ->
                         parseExpression "1 + * 2"
                             |> Expect.equal (Err <| OperatorMissingRight Add)
+                ]
+            ]
+        , describe "Evaluating"
+            [ describe "evaluateAsJson"
+                [ test "5" <|
+                    \_ ->
+                        (Int
+                            (UseInt 5)
+                        )
+                            |> evaluateAsJson (\_ -> Nothing)
+                            |> Expect.equal (NumericValue 5.0 |> Ok)
+                , test "5 + 3" <|
+                    \_ ->
+                        (Int
+                            (IntOperator (UseInt 5) Add (UseInt 3))
+                        )
+                            |> evaluateAsJson (\_ -> Nothing)
+                            |> Expect.equal (NumericValue 8.0 |> Ok)
+                , test "5 + 3 * 4" <|
+                    \_ ->
+                        (Int
+                            (IntOperator
+                                (UseInt 5)
+                                Add
+                                (IntOperator
+                                    (UseInt 3)
+                                    Multiply
+                                    (UseInt 4)
+                                )
+                            )
+                        )
+                            |> evaluateAsJson (\_ -> Nothing)
+                            |> Expect.equal (NumericValue 17.0 |> Ok)
+                , test "$a + 3 * $b" <|
+                    \_ ->
+                        (Int
+                            (IntOperator
+                                (ReadInt "a")
+                                Add
+                                (IntOperator
+                                    (UseInt 3)
+                                    Multiply
+                                    (ReadInt "b")
+                                )
+                            )
+                        )
+                            |> evaluateAsJson
+                                ([ ( "a", 5 ), ( "b", 4 ) ]
+                                    |> Dict.fromList
+                                    |> flip Dict.get
+                                )
+                            |> Expect.equal (NumericValue 17.0 |> Ok)
+                , test "HttpGetJson" <|
+                    \_ ->
+                        (Procedure
+                            (HttpGetJson "https://api.example.com/")
+                        )
+                            |> evaluateAsJson (\_ -> Nothing)
+                            |> Expect.equal
+                                (ObjectValue
+                                    ([ ( "jsonrpc", StringValue "2.0" )
+                                     , ( "method", StringValue "HTTP" )
+                                     , ( "params"
+                                       , ObjectValue
+                                            ([ ( "method", StringValue "GET" )
+                                             , ( "acceptMimeType", StringValue "application/json" )
+                                             , ( "url", StringValue "https://api.example.com/" )
+                                             ]
+                                            )
+                                       )
+                                     , ( "id", StringValue "HTTP GET application/json https://api.example.com/" )
+                                     ]
+                                    )
+                                    |> Ok
+                                )
                 ]
             ]
         ]

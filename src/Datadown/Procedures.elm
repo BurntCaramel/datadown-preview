@@ -1,6 +1,7 @@
 module Datadown.Procedures
     exposing
         ( Procedure(..)
+        , toRpcJson
         )
 
 {-| Procedures

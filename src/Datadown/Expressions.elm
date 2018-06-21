@@ -10,15 +10,15 @@ module Datadown.Expressions
         , tokenize
         , parseExpression
         , evaluateAsInt
+        , evaluateAsJson
         )
 
 import Char
 import Set exposing (Set)
 import Parser exposing (..)
-import JsonValue
+import JsonValue exposing (..)
 import Datadown.Url exposing (Url(..), schemeAndStringToUrl)
-import Datadown.Procedures exposing (Procedure(..))
-import Datadown.Rpc
+import Datadown.Procedures exposing (Procedure(..), toRpcJson)
 
 
 type Operator
@@ -271,7 +271,7 @@ parseExpression input =
 
 
 type EvaluateError
-    = MustBeIntExpression Expression
+    = CannotEvaluateExpression Expression
     | ValueForIdentifierMustBeInt String
 
 
@@ -317,4 +317,19 @@ evaluateAsInt resolveIdentifier expression =
             evaluateIntExpression resolveIdentifier expression
 
         _ ->
-            Err <| MustBeIntExpression expression
+            Err <| CannotEvaluateExpression expression
+
+
+evaluateAsJson : (String -> Maybe Int) -> Expression -> Result EvaluateError JsonValue
+evaluateAsJson resolveIdentifier expression =
+    case expression of
+        Int expression ->
+            evaluateIntExpression resolveIdentifier expression
+                |> Result.map (toFloat >> JsonValue.NumericValue)
+
+        Procedure procedure ->
+            toRpcJson procedure
+                |> Ok
+
+        _ ->
+            Err <| CannotEvaluateExpression expression
