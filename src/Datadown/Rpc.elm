@@ -35,8 +35,8 @@ type alias Id =
 {-| A command, modelled after the JSON remote procedure call.
 See: <http://www.jsonrpc.org/specification>
 -}
-type alias Rpc =
-    { method : String
+type alias Rpc a =
+    { method : a
     , params : Maybe JsonValue
     , id : Id
     }
@@ -62,7 +62,7 @@ type alias Response =
 {-| Convert a JsonValue into a Rpc.
 Requires fields "method" and "id", optionally "params".
 -}
-fromJsonValue : JsonValue -> Maybe Rpc
+fromJsonValue : JsonValue -> Maybe (Rpc String)
 fromJsonValue json =
     case json of
         JsonValue.ObjectValue pairs ->
@@ -106,7 +106,7 @@ fromJsonValue json =
             Nothing
 
 
-graphQL : String -> Rpc
+graphQL : String -> Rpc String
 graphQL queryString =
     let
         params =
@@ -117,7 +117,7 @@ graphQL queryString =
         Rpc "graphql" (Just params) queryString
 
 
-getParam : List String -> Rpc -> Maybe JsonValue
+getParam : List String -> Rpc String -> Maybe JsonValue
 getParam path rpc =
     Maybe.andThen (JsonValue.getIn path >> Result.toMaybe) rpc.params
 
@@ -151,7 +151,7 @@ convertError httpError =
             Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)
 
 
-convertResult : Rpc -> Result Http.Error JsonValue -> Response
+convertResult : Rpc String -> Result Http.Error JsonValue -> Response
 convertResult rpc httpResult =
     let
         result =
@@ -161,7 +161,7 @@ convertResult rpc httpResult =
         Response rpc.id result
 
 
-toCommand : (Response -> msg) -> Rpc -> Maybe (Cmd msg)
+toCommand : (Response -> msg) -> Rpc String -> Maybe (Cmd msg)
 toCommand toMessage rpc =
     case rpc.method of
         "HTTP" ->

@@ -583,7 +583,7 @@ update msg model =
                         _ ->
                             Nothing
 
-                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List Rpc
+                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List (Rpc String)
                 rpcsFromSection ( title, section ) =
                     case section of
                         ResolvedSection { rpcs } ->
@@ -635,7 +635,7 @@ update msg model =
                         _ ->
                             Nothing
 
-                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List Rpc
+                rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List (Rpc String)
                 rpcsFromSection ( title, section ) =
                     case section of
                         ResolvedSection { rpcs } ->
@@ -795,7 +795,7 @@ viewCode options maybeLanguage source =
             div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
 
 
-viewRpc : Rpc -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
+viewRpc : Rpc String -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
 viewRpc rpc maybeResponse =
     let
         loadButton =

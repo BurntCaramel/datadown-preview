@@ -57,7 +57,7 @@ type ResolvedSection e a
     = ResolvedSection
         { mainContent : List (Result e (Content a))
         , subsections : List ( String, ResolvedSection e a )
-        , rpcs : List Rpc
+        , rpcs : List (Rpc String)
         }
 
 
@@ -404,11 +404,11 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
             expressionForString s
                 |> Maybe.andThen (evaluateExpression (valueForIdentifier context) >> Result.toMaybe)
 
-        noRpcs : Content a -> ( Content a, List Rpc )
+        noRpcs : Content a -> ( Content a, List (Rpc String) )
         noRpcs content =
             ( content, [] )
 
-        processContent : Content a -> Result (Error e) ( Content a, List Rpc )
+        processContent : Content a -> Result (Error e) ( Content a, List (Rpc String) )
         processContent content =
             case content of
                 Text text ->
@@ -416,7 +416,7 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
 
                 List contentItems ->
                     let
-                        reduceItem : ( Content a, ListItemQualifier a ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List Rpc ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List Rpc )
+                        reduceItem : ( Content a, ListItemQualifier a ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List (Rpc String) ) -> Result (Error e) ( List ( Content a, ListItemQualifier a ), List (Rpc String) )
                         reduceItem ( item, qualifier ) result =
                             case result of
                                 Ok ( items, rpcs ) ->
@@ -492,7 +492,7 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                 content ->
                     Ok ( content, [] )
 
-        processNextContent : Content a -> ( List (Result (Error e) (Content a)), List Rpc ) -> ( List (Result (Error e) (Content a)), List Rpc )
+        processNextContent : Content a -> ( List (Result (Error e) (Content a)), List (Rpc String) ) -> ( List (Result (Error e) (Content a)), List (Rpc String) )
         processNextContent content ( results, rpcs ) =
             case processContent content of
                 Ok ( newResult, newRpcs ) ->
