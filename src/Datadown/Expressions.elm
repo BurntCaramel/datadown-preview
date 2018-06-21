@@ -1,7 +1,6 @@
 module Datadown.Expressions
     exposing
         ( Operator(..)
-        , Url(..)
         , Token(..)
         , IntExpression(..)
         , BoolExpression(..)
@@ -16,6 +15,10 @@ module Datadown.Expressions
 import Char
 import Set exposing (Set)
 import Parser exposing (..)
+import JsonValue
+import Datadown.Url exposing (Url(..), schemeAndStringToUrl)
+import Datadown.Procedures exposing (Procedure(..))
+import Datadown.Rpc
 
 
 type Operator
@@ -39,16 +42,6 @@ precendenceOfOperator op =
 
         Subtract ->
             1
-
-
-type Url
-    = Https String
-    | Mailto String
-    | Tel String
-    | Math String
-    | Time String
-      -- | Data String String
-    | Other String String
 
 
 type Token
@@ -102,50 +95,6 @@ operator =
         , succeed Divide
             |. symbol "/"
         ]
-
-
-schemeAndStringToUrl : String -> String -> Url
-schemeAndStringToUrl scheme string =
-    case scheme of
-        "https" ->
-            Https string
-
-        "mailto" ->
-            Mailto string
-
-        "tel" ->
-            Tel string
-
-        "math" ->
-            Math string
-
-        "time" ->
-            Time string
-
-        _ ->
-            Other scheme string
-
-
-urlToString : Url -> String
-urlToString url =
-    case url of
-        Https string ->
-            "https:" ++ string
-
-        Mailto email ->
-            "mailto:" ++ email
-
-        Tel phone ->
-            "tel:" ++ phone
-
-        Math string ->
-            "math:" ++ string
-
-        Time string ->
-            "time:" ++ string
-
-        Other scheme string ->
-            scheme ++ ":" ++ string
 
 
 whitespaceChars : Set Char
@@ -230,6 +179,7 @@ type Expression
     = Empty
     | Int IntExpression
     | Bool BoolExpression
+    | Procedure Procedure
 
 
 type ParseError
@@ -239,6 +189,7 @@ type ParseError
     | OperatorMissingRight Operator
     | OperatorMustHaveNumericLeft Expression Operator
     | OperatorMustHaveNumericRight Expression Operator Expression
+    | UnsupportedUrl Url
     | Invalid Expression (List Token)
 
 
@@ -259,6 +210,20 @@ parseNext right tokens =
 
         ( Empty, (BoolLiteral b) :: rest ) ->
             parseNext (UseBool b |> Bool) rest
+
+        ( Empty, (Url url) :: rest ) ->
+            case url of
+                Https sansScheme ->
+                    let
+                        urlString =
+                            "https:" ++ sansScheme
+                    in
+                        HttpGetJson urlString
+                            |> Procedure
+                            |> Ok
+
+                url ->
+                    Err <| UnsupportedUrl url
 
         ( Empty, (Operator op) :: rest ) ->
             Err <| OperatorMissingRight op

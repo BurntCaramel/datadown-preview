@@ -6,7 +6,9 @@ import Expect exposing (Expectation)
 -- import Fuzz exposing (Fuzzer, int, list, string)
 
 import Test exposing (..)
-import Datadown.Expressions exposing (Operator(..), Url(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
+import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt)
+import Datadown.Url exposing (Url(..))
+import Datadown.Procedures exposing (Procedure(..))
 
 
 suite : Test
@@ -242,6 +244,14 @@ suite =
                                     Add
                                     (UseInt 5)
                                     |> Int
+                                    |> Ok
+                                )
+                , test "https://api.example.com/" <|
+                    \_ ->
+                        parseExpression "https://api.example.com/"
+                            |> Expect.equal
+                                (HttpGetJson "https://api.example.com/"
+                                    |> Procedure
                                     |> Ok
                                 )
                 ]
