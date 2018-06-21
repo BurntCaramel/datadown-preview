@@ -38,7 +38,6 @@ suite =
                     \_ ->
                         tokenize "2 * 1 + 3"
                             |> Expect.equal (Ok <| [ IntLiteral 2, Operator Multiply, IntLiteral 1, Operator Add, IntLiteral 3 ])
-
                 , test "2 + 1 * 3" <|
                     \_ ->
                         tokenize "2 + 1 * 3"
@@ -184,7 +183,7 @@ suite =
                                     |> Ok
                                 )
                 ]
-            ,  describe "parseExpression Err"
+            , describe "parseExpression Err"
                 [ test "+" <|
                     \_ ->
                         parseExpression "+"
@@ -200,7 +199,7 @@ suite =
                 , test "1 2" <|
                     \_ ->
                         parseExpression "1 2"
-                            |> Expect.equal (Err <| Invalid (Int (UseInt 2)) [IntLiteral 1])
+                            |> Expect.equal (Err <| Invalid (Int (UseInt 2)) [ IntLiteral 1 ])
                 , test "1 + * 2" <|
                     \_ ->
                         parseExpression "1 + * 2"
