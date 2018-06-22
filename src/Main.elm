@@ -1141,7 +1141,7 @@ viewListInner collection model activeKey =
         viewItem key documentSource =
             h2 [ class "" ]
                 [ button
-                    [ class "w-full px-4 py-2 text-left text-lg font-bold cursor-default"
+                    [ class "w-full px-4 py-2 text-left text-base font-bold cursor-default"
                     , if Just key == activeKey then
                         class "text-indigo-darkest bg-blue-light"
                       else
@@ -1191,7 +1191,7 @@ viewCollectionSummary collection =
                     text "Example"
     in
         div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
-            [ h2 [ class "text-white" ] [ message ]
+            [ h2 [ class "text-sm text-white" ] [ message ]
             ]
 
 
