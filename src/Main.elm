@@ -277,8 +277,8 @@ modelWithCurrentDocumentProcessed model =
             model
 
 
-exampleDocumentSources : Dict String String
-exampleDocumentSources =
+tourDocumentSources : Dict String String
+tourDocumentSources =
     [ ( "1-welcome", Samples.Welcome.source )
     , ( "2-clock", Samples.Clock.source )
     , ( "3-button", Samples.Button.source )
@@ -310,11 +310,11 @@ init flags location =
                       ]
                     )
 
-                Just Example ->
+                Just Tour ->
                     ( Dict.singleton
-                        (Example |> Routes.collectionSourceToId)
+                        (Tour |> Routes.collectionSourceToId)
                         Loaded
-                    , exampleDocumentSources
+                    , tourDocumentSources
                     , []
                     )
 
@@ -1168,8 +1168,8 @@ viewListInner collection model activeKey =
                                 GitHubRepo owner repoName branch ->
                                     "Loading @" ++ owner ++ "/" ++ repoName ++ "/" ++ branch ++ " from GitHub…"
 
-                                Example ->
-                                    "Loading examples…"
+                                Tour ->
+                                    "Loading Tours…"
                     in
                         [ h2 [ class "mt-3" ]
                             [ text message ]
@@ -1203,8 +1203,8 @@ viewCollectionSummary collection =
                         [ text <| "@" ++ owner ++ " " ++ repoName ++ " " ++ branch ++ " from GitHub"
                         ]
 
-                Example ->
-                    text "Example"
+                Tour ->
+                    text "Tour"
     in
         div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
             [ h2 [ class "text-sm text-white" ] [ message ]
@@ -1527,7 +1527,7 @@ view model =
                         [ text "Datadown" ]
                     , h2 [ class "mb-4 text-center" ]
                         [ text "Make components & prototypes simply by writing Markdown." ]
-                    , h3 [] [ a [ href "/example" ] [ text "See examples" ] ]
+                    , h3 [] [ a [ href "/tour" ] [ text "Take a tour" ] ]
                     , h3 [] [ a [ href "/github/RoyalIcing/lofi-bootstrap/master" ] [ text "@RoyalIcing/lofi-bootstrap" ] ]
                     ]
 

@@ -37,7 +37,7 @@ editModeFromString maybeString =
 
 
 type CollectionSource
-    = Example
+    = Tour
     | GitHubRepo String String String
 
 
@@ -61,16 +61,16 @@ fromPath path =
             [] ->
                 Landing
 
-            "example" :: rest ->
+            "tour" :: rest ->
                 case rest of
                     [] ->
-                        Collection Example
+                        Collection Tour
 
                     [ "content" ] ->
-                        CollectionContentSources Example
+                        CollectionContentSources Tour
 
                     items ->
-                        CollectionItem Example (String.join "/" items) WithPreview
+                        CollectionItem Tour (String.join "/" items) WithPreview
 
             "github" :: owner :: repo :: ref :: rest ->
                 let
@@ -99,24 +99,24 @@ toPath route =
 
         Collection collection ->
             case collection of
-                Example ->
-                    "/example"
+                Tour ->
+                    "/tour"
 
                 GitHubRepo owner repo ref ->
                     "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref
 
         CollectionItem collection key editMode ->
             case collection of
-                Example ->
-                    "/example/" ++ key
+                Tour ->
+                    "/tour/" ++ key
 
                 GitHubRepo owner repo ref ->
                     "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref ++ "/" ++ key
 
         CollectionContentSources collection ->
             case collection of
-                Example ->
-                    "/example/content"
+                Tour ->
+                    "/tour/content"
 
                 GitHubRepo owner repo ref ->
                     "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref ++ "/" ++ "content"
