@@ -466,7 +466,7 @@ update msg model =
                         |> modelWithDocumentProcessed key
             in
                 newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
-        
+
         GoToContentSources collection ->
             let
                 newRoute =
@@ -1142,7 +1142,7 @@ viewNavListItem title active clickMsg =
             [ class "w-full px-4 py-2 text-left text-base font-bold cursor-default"
             , if active then
                 class "text-indigo-darkest bg-blue-light"
-                else
+              else
                 class "text-white bg-indigo-darkest"
             , onClick clickMsg
             ]
@@ -1456,7 +1456,7 @@ view model =
         [ case model.route of
             Collection collection ->
                 viewList collection model
-            
+
             CollectionContentSources collection ->
                 let
                     field url alias =

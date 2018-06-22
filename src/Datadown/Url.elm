@@ -1,36 +1,60 @@
-module Datadown.Url exposing (Url(..), schemeAndStringToUrl, urlToString)
+module Datadown.Url
+    exposing
+        ( Url(..)
+        , MathFunction(..)
+        , schemeAndStringToUrl
+        , urlToString
+        )
+
+
+type MathFunction
+    = Pi
+    | E
 
 
 type Url
     = Https String
     | Mailto String
     | Tel String
-    | Math String
+    | Math MathFunction
     | Time String
       -- | Data String String
     | Other String String
 
 
-schemeAndStringToUrl : String -> String -> Url
+schemeAndStringToUrl : String -> String -> Maybe Url
 schemeAndStringToUrl scheme string =
     case scheme of
         "https" ->
             Https string
+                |> Just
 
         "mailto" ->
             Mailto string
+                |> Just
 
         "tel" ->
             Tel string
+                |> Just
 
         "math" ->
-            Math string
+            case string of
+                "pi" ->
+                    Just <| Math Pi
+
+                "e" ->
+                    Just <| Math E
+
+                _ ->
+                    Nothing
 
         "time" ->
             Time string
+                |> Just
 
         _ ->
             Other scheme string
+                |> Just
 
 
 urlToString : Url -> String
@@ -45,8 +69,13 @@ urlToString url =
         Tel phone ->
             "tel:" ++ phone
 
-        Math string ->
-            "math:" ++ string
+        Math f ->
+            case f of
+                Pi ->
+                    "math:pi"
+
+                E ->
+                    "math:e"
 
         Time string ->
             "time:" ++ string

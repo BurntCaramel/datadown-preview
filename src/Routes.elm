@@ -65,8 +65,8 @@ fromPath path =
                 case rest of
                     [] ->
                         Collection Example
-                    
-                    ["content"] ->
+
+                    [ "content" ] ->
                         CollectionContentSources Example
 
                     items ->
@@ -80,8 +80,8 @@ fromPath path =
                     case rest of
                         [] ->
                             Collection collection
-                        
-                        ["content"] ->
+
+                        [ "content" ] ->
                             CollectionContentSources collection
 
                         items ->
@@ -112,7 +112,7 @@ toPath route =
 
                 GitHubRepo owner repo ref ->
                     "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref ++ "/" ++ key
-        
+
         CollectionContentSources collection ->
             case collection of
                 Example ->
@@ -133,13 +133,12 @@ collectionSourceFor route =
 
         CollectionItem collection _ _ ->
             Just collection
-        
+
         CollectionContentSources collection ->
             Just collection
 
         _ ->
             Nothing
-
 
 
 type alias CollectionSourceId =

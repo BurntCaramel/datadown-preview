@@ -7,7 +7,7 @@ import Expect exposing (Expectation)
 
 import Test exposing (..)
 import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt, evaluateAsJson)
-import Datadown.Url exposing (Url(..))
+import Datadown.Url exposing (Url(..), MathFunction(..))
 import Datadown.Procedures exposing (Procedure(..))
 import JsonValue exposing (..)
 import Dict
@@ -109,6 +109,22 @@ suite =
                         tokenize "https://www.example.com/"
                             |> Expect.equal
                                 ([ Url (Https "//www.example.com/")
+                                 ]
+                                    |> Ok
+                                )
+                , test "math:pi" <|
+                    \_ ->
+                        tokenize "math:pi"
+                            |> Expect.equal
+                                ([ Url (Math Pi)
+                                 ]
+                                    |> Ok
+                                )
+                , test "math:e" <|
+                    \_ ->
+                        tokenize "math:e"
+                            |> Expect.equal
+                                ([ Url (Math E)
                                  ]
                                     |> Ok
                                 )
@@ -256,6 +272,14 @@ suite =
                                     |> Procedure
                                     |> Ok
                                 )
+                , test "math:pi" <|
+                    \_ ->
+                        parseExpression "math:pi"
+                            |> Expect.equal
+                                (Math0 Pi
+                                    |> Int
+                                    |> Ok
+                                )
                 ]
             , describe "parseExpression Err"
                 [ test "+" <|
@@ -351,6 +375,14 @@ suite =
                                      , ( "id", StringValue "HTTP GET application/json https://api.example.com/" )
                                      ]
                                     )
+                                    |> Ok
+                                )
+                , test "Math0 Pi" <|
+                    \_ ->
+                        (Int <| Math0 Pi)
+                            |> evaluateAsJson (\_ -> Nothing)
+                            |> Expect.equal
+                                (NumericValue 3
                                     |> Ok
                                 )
                 ]

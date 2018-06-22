@@ -17,7 +17,7 @@ import Char
 import Set exposing (Set)
 import Parser exposing (..)
 import JsonValue exposing (..)
-import Datadown.Url exposing (Url(..), schemeAndStringToUrl)
+import Datadown.Url exposing (Url(..), MathFunction(..), schemeAndStringToUrl)
 import Datadown.Procedures exposing (Procedure(..), toRpcJson)
 
 
@@ -112,8 +112,16 @@ isNonWhitespace c =
 url : Parser Token
 url =
     delayedCommitMap schemeAndStringToUrl
-        (keep oneOrMore Char.isLower |. symbol ":")
+        (keep oneOrMore Char.isLower
+            |. symbol ":"
+        )
         (keep oneOrMore isNonWhitespace)
+        |> andThen
+            (\maybeUrl ->
+                maybeUrl
+                    |> Maybe.map succeed
+                    |> Maybe.withDefault (fail "Invalid URL")
+            )
         |> map Url
 
 
@@ -169,6 +177,7 @@ type IntExpression
     = ReadInt String
     | UseInt Int
     | IntOperator IntExpression Operator IntExpression
+    | Math0 MathFunction
 
 
 type BoolExpression
@@ -213,6 +222,11 @@ parseNext right tokens =
 
         ( Empty, (Url url) :: rest ) ->
             case url of
+                Math f ->
+                    Math0 f
+                        |> Int
+                        |> Ok
+
                 Https sansScheme ->
                     let
                         urlString =
@@ -308,6 +322,14 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (//)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
+        
+        Math0 f ->
+            case f of
+                Pi ->
+                    pi |> round |> Ok
+                
+                E ->
+                    e |> round |> Ok
 
 
 evaluateAsInt : (String -> Maybe Int) -> Expression -> Result EvaluateError Int
