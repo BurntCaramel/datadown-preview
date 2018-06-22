@@ -1270,7 +1270,7 @@ viewQueryField field =
 viewMutationField : QueryModel.FieldDefinition -> Html Message
 viewMutationField field =
     button
-        [ class "px-2 py-1 mb-1 text-blue border border-blue"
+        [ class "px-2 py-1 mb-1 text-white bg-blue rounded-sm border border-blue-dark"
         , onClick (RunMutation field.name)
         ]
         [ text (field.name) ]
