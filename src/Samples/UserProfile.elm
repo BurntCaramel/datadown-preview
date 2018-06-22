@@ -5,7 +5,7 @@ source : String
 source =
     """# User Profile
 
-## profile_data
+## profileData
 ```
 https://randomuser.me/api
 ```
@@ -13,10 +13,10 @@ https://randomuser.me/api
 ## view
 ```html
 <Row>
-{{#profile_data.result.results.0}}
+{{#profileData.result.results.0}}
 <img class="rounded-full mr-2" src="{{ .picture.thumbnail }}">
 <strong>{{ .name.first }} {{ .name.last }}</strong>
-{{/profile_data.result.results.0}}
+{{/profileData.result.results.0}}
 </Row>
 ```
 """

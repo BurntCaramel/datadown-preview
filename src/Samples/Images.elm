@@ -5,7 +5,7 @@ source : String
 source =
     """# Images
 
-## placeholder_url
+## placeholderURL
 <https://via.placeholder.com/100x100>
 
 ## size
@@ -14,7 +14,7 @@ source =
 ## subject
 beach
 
-## unsplash_url
+## unsplashURL
 https://source.unsplash.com/{{size * 2}}x{{size * 2}}?{{subject}}
 
 ## embedded
@@ -22,9 +22,9 @@ data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12
 
 ## view
 ```html
-<img src="{{ unsplash_url }}" width="{{size}}">
+<img src="{{ unsplashURL }}" width="{{size}}">
 <br>
-<img src="{{ placeholder_url }}">
+<img src="{{ placeholderURL }}">
 <br>
 <img src="{{ embedded }}">
 ```
