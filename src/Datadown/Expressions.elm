@@ -17,7 +17,7 @@ import Char
 import Set exposing (Set)
 import Parser exposing (..)
 import JsonValue exposing (..)
-import Datadown.Url exposing (Url(..), MathFunction(..), schemeAndStringToUrl)
+import Datadown.Url exposing (Url(..), MathFunction(..), TimeFunction(..), schemeAndStringToUrl)
 import Datadown.Procedures exposing (Procedure(..), toRpcJson)
 
 
@@ -116,12 +116,6 @@ url =
             |. symbol ":"
         )
         (keep oneOrMore isNonWhitespace)
-        |> andThen
-            (\maybeUrl ->
-                maybeUrl
-                    |> Maybe.map succeed
-                    |> Maybe.withDefault (fail "Invalid URL")
-            )
         |> map Url
 
 
@@ -178,6 +172,7 @@ type IntExpression
     | UseInt Int
     | IntOperator IntExpression Operator IntExpression
     | Math0 MathFunction
+    | Time0 TimeFunction
 
 
 type BoolExpression
@@ -222,7 +217,7 @@ parseNext right tokens =
 
         ( Empty, (Url url) :: rest ) ->
             case url of
-                Math f ->
+                Math (Ok f) ->
                     Math0 f
                         |> Int
                         |> Ok
@@ -330,6 +325,11 @@ evaluateIntExpression resolveIdentifier expression =
                 
                 E ->
                     e |> round |> Ok
+        
+        Time0 f ->
+            case f of
+                SecondsSinceUnixEpoch ->
+                    0 |> Ok
 
 
 evaluateAsInt : (String -> Maybe Int) -> Expression -> Result EvaluateError Int

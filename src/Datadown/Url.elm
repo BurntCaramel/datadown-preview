@@ -2,6 +2,7 @@ module Datadown.Url
     exposing
         ( Url(..)
         , MathFunction(..)
+        , TimeFunction(..)
         , schemeAndStringToUrl
         , urlToString
         )
@@ -12,49 +13,53 @@ type MathFunction
     | E
 
 
+type TimeFunction
+    = SecondsSinceUnixEpoch
+
+
 type Url
     = Https String
     | Mailto String
     | Tel String
-    | Math MathFunction
-    | Time String
+    | Math (Result String MathFunction)
+    | Time (Result String TimeFunction)
       -- | Data String String
     | Other String String
 
 
-schemeAndStringToUrl : String -> String -> Maybe Url
+schemeAndStringToUrl : String -> String -> Url
 schemeAndStringToUrl scheme string =
     case scheme of
         "https" ->
             Https string
-                |> Just
 
         "mailto" ->
             Mailto string
-                |> Just
 
         "tel" ->
             Tel string
-                |> Just
 
         "math" ->
             case string of
                 "pi" ->
-                    Just <| Math Pi
+                    Pi |> Ok |> Math
 
                 "e" ->
-                    Just <| Math E
+                    E |> Ok |> Math
 
-                _ ->
-                    Nothing
+                s ->
+                    Err s |> Math
 
         "time" ->
-            Time string
-                |> Just
+            case string of
+                "seconds" ->
+                    SecondsSinceUnixEpoch |> Ok |> Time
+                
+                s ->
+                    Err s |> Time
 
         _ ->
             Other scheme string
-                |> Just
 
 
 urlToString : Url -> String
@@ -69,16 +74,24 @@ urlToString url =
         Tel phone ->
             "tel:" ++ phone
 
-        Math f ->
-            case f of
-                Pi ->
+        Math either ->
+            case either of
+                Ok Pi ->
                     "math:pi"
 
-                E ->
+                Ok E ->
                     "math:e"
+                
+                Err s ->
+                    "math:" ++ s
 
-        Time string ->
-            "time:" ++ string
+        Time either ->
+            case either of 
+                Ok SecondsSinceUnixEpoch ->
+                    "time:seconds"
+
+                Err s ->
+                    "math:" ++ s
 
         Other scheme string ->
             scheme ++ ":" ++ string
