@@ -1480,6 +1480,7 @@ view model =
                             , div [ col ]
                                 [ field "https://trello.com/b/4wctPH1u" "collectedIA"
                                 , field "" ""
+                                , button [ class "flex-shrink mt-4 px-2 py-2 text-white bg-black rounded" ] [ text "Update" ]
                                 ]
                             ]
 
