@@ -10,7 +10,7 @@ import Dict exposing (Dict)
 import Set exposing (Set)
 import Task
 import Http
-import Routes exposing (Route(..), CollectionSource(..), EditMode(..))
+import Routes exposing (Route(..), CollectionSource(..), EditMode(..), collectionSourceFor)
 import Datadown exposing (Document, Section(..), Content(..), sectionHasTitle)
 import Datadown.Parse exposing (parseDocument)
 import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
@@ -298,19 +298,8 @@ init flags location =
         route =
             Routes.parseLocation location
 
-        maybeCollection =
-            case route of
-                Collection collection ->
-                    Just collection
-
-                CollectionItem collection _ _ ->
-                    Just collection
-
-                _ ->
-                    Nothing
-
         ( sourceStatuses, documentSources, commands ) =
-            case maybeCollection of
+            case collectionSourceFor route of
                 Just (GitHubRepo owner repo branch) ->
                     ( Dict.singleton
                         (GitHubRepo owner repo branch |> Routes.collectionSourceToId)
@@ -360,6 +349,7 @@ type Message
     | GoToPreviousDocument
     | GoToNextDocument
     | GoToDocumentWithKey CollectionSource String
+    | GoToContentSources CollectionSource
     | NewDocument
     | ChangeSectionInput String JsonValue
     | Time Time
@@ -474,6 +464,16 @@ update msg model =
                 newModel =
                     { model | route = newRoute }
                         |> modelWithDocumentProcessed key
+            in
+                newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
+        
+        GoToContentSources collection ->
+            let
+                newRoute =
+                    CollectionContentSources collection
+
+                newModel =
+                    { model | route = newRoute }
             in
                 newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
 
@@ -1135,21 +1135,26 @@ viewDocumentNavigation model =
         ]
 
 
+viewNavListItem : String -> Bool -> Message -> Html Message
+viewNavListItem title active clickMsg =
+    h2 [ class "" ]
+        [ button
+            [ class "w-full px-4 py-2 text-left text-base font-bold cursor-default"
+            , if active then
+                class "text-indigo-darkest bg-blue-light"
+                else
+                class "text-white bg-indigo-darkest"
+            , onClick clickMsg
+            ]
+            [ text title ]
+        ]
+
+
 viewListInner : CollectionSource -> Model -> Maybe String -> Html Message
 viewListInner collection model activeKey =
     let
         viewItem key documentSource =
-            h2 [ class "" ]
-                [ button
-                    [ class "w-full px-4 py-2 text-left text-base font-bold cursor-default"
-                    , if Just key == activeKey then
-                        class "text-indigo-darkest bg-blue-light"
-                      else
-                        class "text-white bg-indigo-darkest"
-                    , onClick (GoToDocumentWithKey collection key)
-                    ]
-                    [ text key ]
-                ]
+            viewNavListItem key (Just key == activeKey) (GoToDocumentWithKey collection key)
 
         innerHtmls =
             case Dict.get (Routes.collectionSourceToId collection) model.sourceStatuses of
@@ -1173,8 +1178,19 @@ viewListInner collection model activeKey =
                 _ ->
                     []
     in
-        div [ class "h-full bg-indigo-darkest" ]
+        div [ class "bg-indigo-darkest" ]
             innerHtmls
+
+
+viewCollectionConfigLinks : Route -> CollectionSource -> Html Message
+viewCollectionConfigLinks route collection =
+    let
+        contentSourcesActive =
+            route == CollectionContentSources collection
+    in
+        div [ class "pt-4 bg-indigo-darkest" ]
+            [ viewNavListItem "Import content" contentSourcesActive (GoToContentSources collection)
+            ]
 
 
 viewCollectionSummary : CollectionSource -> Html Message
@@ -1198,7 +1214,9 @@ viewCollectionSummary collection =
 viewList : CollectionSource -> Model -> Html Message
 viewList collection model =
     div [ col, class "flex-1 justify-center" ]
-        [ div [ class "mb-8" ] [ viewDocumentNavigation model ]
+        [ div [ class "mb-8" ]
+            [ viewDocumentNavigation model
+            ]
         , div [ class "flex-1 w-full max-w-lg mx-auto" ]
             [ viewListInner collection model Nothing
             ]
@@ -1438,6 +1456,46 @@ view model =
         [ case model.route of
             Collection collection ->
                 viewList collection model
+            
+            CollectionContentSources collection ->
+                let
+                    field url alias =
+                        div [ row, class "mb-4" ]
+                            [ label [ col, class "flex-grow" ]
+                                [ span [ class "font-bold" ] [ text "URL" ]
+                                , input [ class "flex-1 mt-1 px-2 py-1 mr-2 border", value url ] []
+                                ]
+                            , label [ col ]
+                                [ span [ class "font-bold" ] [ text "Alias" ]
+                                , input [ class "flex-1 mt-1 px-2 py-1 border font-mono", value alias ] []
+                                ]
+                            ]
+
+                    documentView =
+                        div [ class "flex-1 p-4" ]
+                            [ h1 [ class "mb-4" ]
+                                [ text "Import content" ]
+                            , p [ class "mb-8" ]
+                                [ text "Work with content from GitHub and Trello." ]
+                            , div [ col ]
+                                [ field "https://trello.com/b/4wctPH1u" "collectedIA"
+                                , field "" ""
+                                ]
+                            ]
+
+                    listView =
+                        div [ class "w-1/5" ]
+                            [ div [ class "fixed w-1/5 h-full bg-indigo-darkest" ]
+                                [ viewCollectionSummary collection
+                                , viewListInner collection model Nothing
+                                , viewCollectionConfigLinks model.route collection
+                                ]
+                            ]
+                in
+                    div [ row, class "flex-1" ]
+                        [ listView
+                        , documentView
+                        ]
 
             CollectionItem collection key _ ->
                 let
@@ -1450,9 +1508,10 @@ view model =
 
                     listView =
                         div [ class "w-1/5" ]
-                            [ div [ class "fixed w-1/5 h-full" ]
+                            [ div [ class "fixed w-1/5 h-full bg-indigo-darkest" ]
                                 [ viewCollectionSummary collection
                                 , viewListInner collection model (Just key)
+                                , viewCollectionConfigLinks model.route collection
                                 ]
                             ]
                 in

@@ -5,6 +5,7 @@ module Routes
         , EditMode(..)
         , parseLocation
         , toPath
+        , collectionSourceFor
         , CollectionSourceId
         , collectionSourceToId
         )
@@ -44,6 +45,7 @@ type Route
     = Landing
     | Collection CollectionSource
     | CollectionItem CollectionSource String EditMode
+    | CollectionContentSources CollectionSource
     | NotFound String
 
 
@@ -63,6 +65,9 @@ fromPath path =
                 case rest of
                     [] ->
                         Collection Example
+                    
+                    ["content"] ->
+                        CollectionContentSources Example
 
                     items ->
                         CollectionItem Example (String.join "/" items) WithPreview
@@ -75,6 +80,9 @@ fromPath path =
                     case rest of
                         [] ->
                             Collection collection
+                        
+                        ["content"] ->
+                            CollectionContentSources collection
 
                         items ->
                             CollectionItem collection (String.join "/" items) WithPreview
@@ -104,9 +112,34 @@ toPath route =
 
                 GitHubRepo owner repo ref ->
                     "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref ++ "/" ++ key
+        
+        CollectionContentSources collection ->
+            case collection of
+                Example ->
+                    "/example/content"
+
+                GitHubRepo owner repo ref ->
+                    "/github/" ++ owner ++ "/" ++ repo ++ "/" ++ ref ++ "/" ++ "content"
 
         NotFound path ->
             path
+
+
+collectionSourceFor : Route -> Maybe CollectionSource
+collectionSourceFor route =
+    case route of
+        Collection collection ->
+            Just collection
+
+        CollectionItem collection _ _ ->
+            Just collection
+        
+        CollectionContentSources collection ->
+            Just collection
+
+        _ ->
+            Nothing
+
 
 
 type alias CollectionSourceId =
