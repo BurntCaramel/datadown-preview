@@ -725,6 +725,11 @@ col =
     class "flex flex-col"
 
 
+buttonStyle : String -> Html.Attribute msg
+buttonStyle color =
+    class <| "inline-block px-4 py-2 text-bold no-underline text-white bg-" ++  color ++ " rounded"
+
+
 open : Bool -> Html.Attribute msg
 open flag =
     if flag then
@@ -1522,13 +1527,13 @@ view model =
                         ]
 
             _ ->
-                div [ col, class "flex flex-row flex-1 max-w-lg p-4 text-center text-grey-darkest" ]
+                div [ col, class "flex flex-row flex-1 max-w-sm p-4 text-center text-grey-darkest" ]
                     [ h1 [ class "mb-2 text-center" ]
-                        [ text "Datadown" ]
-                    , h2 [ class "mb-4 text-center" ]
-                        [ text "Make components & prototypes simply by writing Markdown." ]
-                    , h3 [] [ a [ href "/tour" ] [ text "Take a tour" ] ]
-                    , h3 [] [ a [ href "/github/RoyalIcing/lofi-bootstrap/master" ] [ text "@RoyalIcing/lofi-bootstrap" ] ]
+                        [ text "Prototype rich functionality, in your browser" ]
+                    , h2 [ class "mb-4 text-center font-normal  " ]
+                        [ text "Design screens, components, and interactivity. Use real APIs." ]
+                    , h3 [] [ a [ href "/tour", buttonStyle "purple-dark", class "mb-2" ] [ text "See examples" ] ]
+                    , h3 [] [ a [ href "/github/RoyalIcing/lofi-bootstrap/master", buttonStyle "purple-dark", class "mb-2" ] [ text "Bootstrap 4 components" ] ]
                     ]
 
         -- , div [ class "fixed pin-b pin-l flex pb-4 pl-4 md:pl-6" ]
