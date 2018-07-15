@@ -1531,7 +1531,7 @@ view model =
                     [ h1 [ class "mb-2 text-center" ]
                         [ text "Prototype rich functionality, in your browser" ]
                     , h2 [ class "mb-4 text-center font-normal  " ]
-                        [ text "Design screens, components, and interactivity. Use real APIs." ]
+                        [ text "Design screens, components, and interactivity. With real APIs." ]
                     , h3 [] [ a [ href "/tour", buttonStyle "purple-dark", class "mb-2" ] [ text "See examples" ] ]
                     , h3 [] [ a [ href "/github/RoyalIcing/lofi-bootstrap/master", buttonStyle "purple-dark", class "mb-2" ] [ text "Bootstrap 4 components" ] ]
                     ]
