@@ -1216,18 +1216,6 @@ viewCollectionSummary collection =
             ]
 
 
-viewList : CollectionSource -> Model -> Html Message
-viewList collection model =
-    div [ col, class "flex-1 justify-center" ]
-        [ div [ class "mb-8" ]
-            [ viewDocumentNavigation model
-            ]
-        , div [ class "flex-1 w-full max-w-lg mx-auto" ]
-            [ viewListInner collection model Nothing
-            ]
-        ]
-
-
 processDocumentWithModel : Model -> Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
 processDocumentWithModel model document =
     processDocument (evaluateExpressions model) (contentToJson model) document
@@ -1460,7 +1448,23 @@ view model =
     div [ class "flex justify-center flex-1" ]
         [ case model.route of
             Collection collection ->
-                viewList collection model
+                let
+                    documentView =
+                        div [] []
+
+                    listView =
+                        div [ class "w-1/5" ]
+                            [ div [ class "fixed w-1/5 h-full overflow-auto bg-indigo-darkest" ]
+                                [ viewCollectionSummary collection
+                                , viewListInner collection model Nothing
+                                , viewCollectionConfigLinks model.route collection
+                                ]
+                            ]
+                in
+                    div [ row, class "flex-1" ]
+                        [ listView
+                        , documentView
+                        ]
 
             CollectionContentSources collection ->
                 let
