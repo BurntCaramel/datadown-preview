@@ -32,6 +32,7 @@ import Samples.API
 import Samples.UserProfile
 import Samples.WikiModel
 import Samples.FileBrowserModel
+import Samples.Csv
 import Services.CollectedSource
 
 
@@ -283,10 +284,11 @@ tourDocumentSources =
     , ( "2-clock", Samples.Clock.source )
     , ( "3-button", Samples.Button.source )
     , ( "4-images", Samples.Images.source )
-    , ( "5-api", Samples.API.source )
-    , ( "6-user-profile", Samples.UserProfile.source )
-    , ( "7-wiki-model", Samples.WikiModel.source )
-    , ( "8-file-browser", Samples.FileBrowserModel.source )
+    , ( "5-csv", Samples.Csv.source )
+    , ( "6-api", Samples.API.source )
+    , ( "7-user-profile", Samples.UserProfile.source )
+    , ( "8-wiki-model", Samples.WikiModel.source )
+    , ( "9-file-browser", Samples.FileBrowserModel.source )
     , ( "now-you", "# Now your turn!" )
     ]
         |> Dict.fromList

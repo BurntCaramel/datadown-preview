@@ -16,6 +16,7 @@ import Dict exposing (Dict)
 import Html exposing (Html, text)
 import Preview.Html
 import Preview.Json
+import Preview.Csv
 import Preview.Markdown
 
 
@@ -25,6 +26,7 @@ languageToViewTable =
         [ ( "html", Preview.Html.view False )
         , ( "svg", Preview.Html.view True )
         , ( "json", Preview.Json.view )
+        , ( "csv", Preview.Csv.viewFromSource )
         , ( "markdown", Preview.Markdown.view )
         , ( "md", Preview.Markdown.view )
         ]
