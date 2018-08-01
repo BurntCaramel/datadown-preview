@@ -62,11 +62,6 @@ optionalSpaces =
     ignore zeroOrMore isSpace
 
 
-isIdentifierHeadChar : Char -> Bool
-isIdentifierHeadChar c =
-    c == '$'
-
-
 isIdentifierBodyChar : Char -> Bool
 isIdentifierBodyChar c =
     Char.isLower c

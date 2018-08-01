@@ -33,6 +33,7 @@ import Samples.UserProfile
 import Samples.WikiModel
 import Samples.FileBrowserModel
 import Samples.Csv
+import Samples.TypographyEssentials
 import Services.CollectedSource
 
 
@@ -280,15 +281,16 @@ modelWithCurrentDocumentProcessed model =
 
 tourDocumentSources : Dict String String
 tourDocumentSources =
-    [ ( "1-welcome", Samples.Welcome.source )
-    , ( "2-clock", Samples.Clock.source )
-    , ( "3-button", Samples.Button.source )
-    , ( "4-images", Samples.Images.source )
-    , ( "5-csv", Samples.Csv.source )
-    , ( "6-api", Samples.API.source )
-    , ( "7-user-profile", Samples.UserProfile.source )
-    , ( "8-wiki-model", Samples.WikiModel.source )
-    , ( "9-file-browser", Samples.FileBrowserModel.source )
+    [ ( "01-welcome", Samples.Welcome.source )
+    , ( "02-clock", Samples.Clock.source )
+    , ( "03-button", Samples.Button.source )
+    , ( "04-images", Samples.Images.source )
+    , ( "05-csv", Samples.Csv.source )
+    , ( "06-api", Samples.API.source )
+    , ( "07-user-profile", Samples.UserProfile.source )
+    , ( "08-wiki-model", Samples.WikiModel.source )
+    , ( "09-typography-essentials", Samples.TypographyEssentials.source )
+    , ( "10-file-browser", Samples.FileBrowserModel.source )
     , ( "now-you", "# Now your turn!" )
     ]
         |> Dict.fromList
@@ -1255,6 +1257,11 @@ viewQueryField field =
                     div
                         [ class "italic" ]
                         [ text (toString i) ]
+                
+                QueryModel.StringsArrayValue strings ->
+                    ol
+                        [ class "ml-4" ]
+                        (List.map (text >> List.singleton >> li []) strings)
 
                 _ ->
                     text ""
@@ -1264,17 +1271,27 @@ viewQueryField field =
 
 viewMutationField : QueryModel.FieldDefinition -> Html Message
 viewMutationField field =
-    button
-        [ class "px-2 py-1 mb-1 text-white bg-blue rounded-sm border border-blue-dark"
-        , onClick (RunMutation field.name)
-        ]
-        [ text (field.name) ]
+    let
+        argCount =
+            case field.argDefinitions of
+                QueryModel.ArgsDefinition args ->
+                    List.length args
+    in
+        button
+            [ class "px-2 py-1 mb-1 text-white bg-blue rounded-sm border border-blue-dark"
+            , onClick (RunMutation field.name)
+            ]
+            [ text (field.name)
+            , text <| if argCount > 0 then "…" else ""
+            ]
 
 
 viewMutationHistory : List String -> Html Message
 viewMutationHistory mutationNames =
     details [ class "mb-8", open True ]
-        [ summary [] [ text "Mutation history" ]
+        [ summary [ class "font-bold" ]
+            [ text ("Mutation history (" ++ (List.length mutationNames |> toString) ++ ")")
+            ]
         , ol []
             (mutationNames
                 |> List.map (text >> List.singleton >> li [])
@@ -1373,7 +1390,7 @@ viewDocumentPreview model resolved =
 
         maybeMutationModel =
             sectionWithTitle "Mutation"
-                |> Maybe.map MutationModel.parseMutationModel
+                |> Maybe.map (MutationModel.parseMutationModel contentToJson2 sectionDefiningType)
 
         introHtml : List (Html Message)
         introHtml =

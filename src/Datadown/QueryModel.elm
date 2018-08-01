@@ -5,7 +5,9 @@ module Datadown.QueryModel
         , FieldKind(..)
         , FieldValue(..)
         , FieldDefinition
+        , ArgsDefinition(..)
         , queryFieldDefinition
+        , parseFieldDefinitionFromTitleAndSection
         , parseQueryModel
         , applyValuesToModel
         )
@@ -41,6 +43,7 @@ type FieldKind
     = String StringFieldConstraints
     | Bool
     | Int
+    | StringsArray
     | Query
 
 
@@ -48,6 +51,7 @@ type FieldValue
     = StringValue (Result StringFieldError (Maybe String)) StringFieldConstraints
     | BoolValue Bool
     | IntValue Int
+    | StringsArrayValue (List String)
     | QueryValue
 
 
@@ -55,7 +59,12 @@ type alias FieldDefinition =
     { name : String
     , kind : FieldKind
     , value : FieldValue
+    , argDefinitions : ArgsDefinition
     }
+
+
+type ArgsDefinition =
+    ArgsDefinition (List FieldDefinition)
 
 
 type alias QueryModel =
@@ -78,16 +87,20 @@ defaultValueForKind kind =
 
         Int ->
             IntValue 0
+        
+        StringsArray ->
+            StringsArrayValue []
 
         Query ->
             QueryValue
 
 
-queryFieldDefinition : String -> FieldDefinition
-queryFieldDefinition name =
+queryFieldDefinition : String -> List FieldDefinition -> FieldDefinition
+queryFieldDefinition name args =
     { name = name
     , kind = Query
     , value = QueryValue
+    , argDefinitions = ArgsDefinition args
     }
 
 
@@ -112,9 +125,12 @@ jsonListToStringList jsonList =
     List.foldr jsonListToStringListHelper (Just []) jsonList
 
 
-parseFieldDefinition : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ( String, ResolvedSection e a ) -> Maybe FieldDefinition
-parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrapper ) =
+parseNameAndKindFrom : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> String -> ResolvedSection e a -> Maybe ( String, FieldKind )
+parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection section) =
     case String.split ":" rawTitle of
+        "" :: _ ->
+            Nothing
+        
         name :: rawKind :: _ ->
             let
                 kindString =
@@ -130,11 +146,6 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
 
                         "String" ->
                             let
-                                section =
-                                    case sectionWrapper of
-                                        ResolvedSection section ->
-                                            section
-
                                 jsonList =
                                     contentListToJsonList contentToJson section.mainContent
 
@@ -154,6 +165,9 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
 
                         "Int" ->
                             Just Int
+                        
+                        "[String]" ->
+                            Just StringsArray
 
                         customType ->
                             let
@@ -162,39 +176,47 @@ parseFieldDefinition contentToJson sectionDefiningType ( rawTitle, sectionWrappe
 
                                 maybeFieldDefinition =
                                     maybeSection
-                                        |> Maybe.andThen (parseFieldDefinition contentToJson sectionDefiningType)
+                                        |> Maybe.andThen (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
                                         |> Maybe.map .kind
                             in
                                 maybeFieldDefinition
             in
-                case ( name, maybeKind ) of
-                    ( "", _ ) ->
+                case maybeKind of
+                    Nothing ->
                         Nothing
+                    
+                    Just kind ->
+                        Just ( name, kind )
+        _ ->
+            Nothing
 
-                    ( _, Nothing ) ->
-                        Nothing
 
-                    ( name, Just kind ) ->
-                        Just
-                            { name = name
-                            , kind = kind
-                            , value = defaultValueForKind kind
-                            }
+parseFieldDefinitionFromTitleAndSection : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ( String, ResolvedSection e a ) -> Maybe FieldDefinition
+parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType ( rawTitle, ResolvedSection section ) =
+    case parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection section) of
+        Just (name, kind) ->
+            let 
+                args =
+                    section.subsections
+                        |> List.filterMap (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
+            in
+                Just
+                    { name = name
+                    , kind = kind
+                    , value = defaultValueForKind kind
+                    , argDefinitions = ArgsDefinition args
+                    }
 
         _ ->
             Nothing
 
 
 parseQueryModel : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ResolvedSection e a -> QueryModel
-parseQueryModel contentToJson sectionDefiningType sectionWrapper =
+parseQueryModel contentToJson sectionDefiningType (ResolvedSection section) =
     let
-        section =
-            case sectionWrapper of
-                ResolvedSection section ->
-                    section
-
         fields =
-            List.filterMap (parseFieldDefinition contentToJson sectionDefiningType) section.subsections
+            section.subsections
+                |> List.filterMap (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
     in
         QueryModel fields
 
@@ -274,6 +296,20 @@ applyValuesToModel contentToJson sectionWrapper model =
 
                         Nothing ->
                             Just <| StringValue (Ok <| Just s) constraints
+                
+                ( StringsArray, (JsonValue.StringValue s) :: jsonList ) ->
+                    let
+                        strings =
+                            List.foldr (\v l ->
+                                case v of
+                                    JsonValue.StringValue s ->
+                                        s :: l
+                                    
+                                    _ ->
+                                        l
+                            ) [s] jsonList
+                    in
+                        Just <| StringsArrayValue strings
 
                 ( Bool, (JsonValue.BoolValue s) :: [] ) ->
                     Just <| BoolValue s
