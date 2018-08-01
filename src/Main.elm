@@ -1228,8 +1228,8 @@ processDocumentWithModel model document =
 viewQueryField : QueryModel.FieldDefinition -> Html Message
 viewQueryField field =
     dl
-        []
-        [ dt [ class "font-bold" ] [ text field.name ]
+        [ class "mb-3" ]
+        [ dt [ class "text-xl font-bold text-purple mb-1" ] [ text field.name ]
         , dd []
             [ case field.value of
                 QueryModel.StringValue valueResult constraints ->
