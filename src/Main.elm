@@ -1278,7 +1278,7 @@ viewMutationField field =
                     List.length args
     in
         button
-            [ class "px-2 py-1 mb-1 text-white bg-blue rounded-sm border border-blue-dark"
+            [ class "px-2 py-1 mb-1 text-white bg-green rounded-sm border border-green-dark"
             , onClick (RunMutation field.name)
             ]
             [ text (field.name)
