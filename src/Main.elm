@@ -1229,7 +1229,7 @@ viewQueryField : QueryModel.FieldDefinition -> Html Message
 viewQueryField field =
     dl
         [ class "mb-3" ]
-        [ dt [ class "text-xl font-bold text-purple mb-1" ] [ text field.name ]
+        [ dt [ class "text-xl font-bold text-purple mb-2" ] [ text field.name ]
         , dd []
             [ case field.value of
                 QueryModel.StringValue valueResult constraints ->
@@ -1261,7 +1261,7 @@ viewQueryField field =
                 QueryModel.StringsArrayValue strings ->
                     ol
                         [ class "ml-4" ]
-                        (List.map (text >> List.singleton >> li []) strings)
+                        (List.map (text >> List.singleton >> li [ class "mb-2" ]) strings)
 
                 _ ->
                     text ""
