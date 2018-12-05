@@ -24,16 +24,7 @@ import Preview.Json
 import Preview.Decorate
 import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
-import Samples.Welcome
-import Samples.Clock
-import Samples.Button
-import Samples.Images
-import Samples.API
-import Samples.UserProfile
-import Samples.WikiModel
-import Samples.FileBrowserModel
-import Samples.Csv
-import Samples.TypographyEssentials
+import Samples
 import Services.CollectedSource
 
 
@@ -279,23 +270,6 @@ modelWithCurrentDocumentProcessed model =
             model
 
 
-tourDocumentSources : Dict String String
-tourDocumentSources =
-    [ ( "01-welcome", Samples.Welcome.source )
-    , ( "02-clock", Samples.Clock.source )
-    , ( "03-button", Samples.Button.source )
-    , ( "04-images", Samples.Images.source )
-    , ( "05-csv", Samples.Csv.source )
-    , ( "06-api", Samples.API.source )
-    , ( "07-user-profile", Samples.UserProfile.source )
-    , ( "08-wiki-model", Samples.WikiModel.source )
-    , ( "09-typography-essentials", Samples.TypographyEssentials.source )
-    , ( "10-file-browser", Samples.FileBrowserModel.source )
-    , ( "now-you", "# Now your turn!" )
-    ]
-        |> Dict.fromList
-
-
 init : Flags -> Location -> ( Model, Cmd Message )
 init flags location =
     let
@@ -318,7 +292,7 @@ init flags location =
                     ( Dict.singleton
                         (Tour |> Routes.collectionSourceToId)
                         Loaded
-                    , tourDocumentSources
+                    , Samples.tourDocumentSources
                     , []
                     )
 
@@ -1289,12 +1263,12 @@ viewMutationField field =
 viewMutationHistory : List String -> Html Message
 viewMutationHistory mutationNames =
     details [ class "mb-8", open True ]
-        [ summary [ class "font-bold" ]
+        [ summary [ class "font-bold text-green" ]
             [ text ("Mutation history (" ++ (List.length mutationNames |> toString) ++ ")")
             ]
-        , ol []
+        , ol [ class "ml-4" ]
             (mutationNames
-                |> List.map (text >> List.singleton >> li [])
+                |> List.map (text >> List.singleton >> li [ class "" ])
                 |> List.reverse
             )
         ]

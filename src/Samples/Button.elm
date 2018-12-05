@@ -7,10 +7,10 @@ source =
 
 A button similar to Bootstrap 4’s.
 
-## content: text
+## content: `String`
 Click me!
 
-## color: text
+## color: `String`
 - purple
 - orange
 - red
@@ -32,6 +32,7 @@ Click me!
 
 ---
 
+> # Red button
 > ## content
 > Button title
 > ## color
