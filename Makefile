@@ -2,4 +2,4 @@ dev:
 	yarn dev
 
 format: ./tests ./src
-	elm-format-0.18 ./src ./tests
+	./node_modules/.bin/elm-format ./src ./tests

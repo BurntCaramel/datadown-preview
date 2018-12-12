@@ -1,16 +1,8 @@
-module Datadown.QueryModel
-    exposing
-        ( QueryModel
-        , StringFieldError(..)
-        , FieldKind(..)
-        , FieldValue(..)
-        , FieldDefinition
-        , ArgsDefinition(..)
-        , queryFieldDefinition
-        , parseFieldDefinitionFromTitleAndSection
-        , parseQueryModel
-        , applyValuesToModel
-        )
+module Datadown.QueryModel exposing
+    ( parseQueryModel, applyValuesToModel
+    , QueryModel, FieldDefinition, queryFieldDefinition
+    , ArgsDefinition(..), FieldKind(..), FieldValue(..), StringFieldError(..), parseFieldDefinitionFromTitleAndSection
+    )
 
 {-| QueryModel
 
@@ -23,11 +15,11 @@ module Datadown.QueryModel
 
 -}
 
-import Regex
-import JsonValue exposing (JsonValue)
 import Datadown exposing (Content(..))
+import Datadown.Expressions exposing (evaluateAsInt, parseExpression)
 import Datadown.Process exposing (ResolvedSection(..))
-import Datadown.Expressions exposing (parseExpression, evaluateAsInt)
+import Json.Value exposing (JsonValue)
+import Regex
 
 
 type alias StringFieldConstraints =
@@ -63,8 +55,8 @@ type alias FieldDefinition =
     }
 
 
-type ArgsDefinition =
-    ArgsDefinition (List FieldDefinition)
+type ArgsDefinition
+    = ArgsDefinition (List FieldDefinition)
 
 
 type alias QueryModel =
@@ -80,14 +72,14 @@ defaultValueForKind kind =
                 current =
                     Maybe.andThen List.head constraints.choices
             in
-                StringValue (Ok current) constraints
+            StringValue (Ok current) constraints
 
         Bool ->
             BoolValue False
 
         Int ->
             IntValue 0
-        
+
         StringsArray ->
             StringsArrayValue []
 
@@ -113,7 +105,7 @@ contentListToJsonList contentToJson contentList =
 jsonListToStringListHelper : JsonValue -> Maybe (List String) -> Maybe (List String)
 jsonListToStringListHelper jsonList maybeStringList =
     case ( jsonList, maybeStringList ) of
-        ( JsonValue.StringValue s, Just stringList ) ->
+        ( Json.Value.StringValue s, Just stringList ) ->
             Just (s :: stringList)
 
         _ ->
@@ -130,12 +122,12 @@ parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection
     case String.split ":" rawTitle of
         "" :: _ ->
             Nothing
-        
+
         name :: rawKind :: _ ->
             let
                 kindString =
                     rawKind
-                        |> Regex.replace Regex.All (Regex.regex "`") (\_ -> "")
+                        |> Regex.replace (Regex.fromString "`" |> Maybe.withDefault Regex.never) (\_ -> "")
                         |> String.trim
 
                 maybeKind : Maybe FieldKind
@@ -151,7 +143,7 @@ parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection
 
                                 maybeChoices =
                                     case jsonList of
-                                        (JsonValue.ArrayValue items) :: [] ->
+                                        (Json.Value.ArrayValue items) :: [] ->
                                             jsonListToStringList items
 
                                         _ ->
@@ -161,11 +153,11 @@ parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection
                                     maybeChoices
                                         |> StringFieldConstraints
                             in
-                                Just (String constraints)
+                            Just (String constraints)
 
                         "Int" ->
                             Just Int
-                        
+
                         "[String]" ->
                             Just StringsArray
 
@@ -179,14 +171,15 @@ parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection
                                         |> Maybe.andThen (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
                                         |> Maybe.map .kind
                             in
-                                maybeFieldDefinition
+                            maybeFieldDefinition
             in
-                case maybeKind of
-                    Nothing ->
-                        Nothing
-                    
-                    Just kind ->
-                        Just ( name, kind )
+            case maybeKind of
+                Nothing ->
+                    Nothing
+
+                Just kind ->
+                    Just ( name, kind )
+
         _ ->
             Nothing
 
@@ -194,18 +187,18 @@ parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection
 parseFieldDefinitionFromTitleAndSection : (Content a -> Result e JsonValue) -> (String -> Maybe ( String, ResolvedSection e a )) -> ( String, ResolvedSection e a ) -> Maybe FieldDefinition
 parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType ( rawTitle, ResolvedSection section ) =
     case parseNameAndKindFrom contentToJson sectionDefiningType rawTitle (ResolvedSection section) of
-        Just (name, kind) ->
-            let 
+        Just ( name, kind ) ->
+            let
                 args =
                     section.subsections
                         |> List.filterMap (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
             in
-                Just
-                    { name = name
-                    , kind = kind
-                    , value = defaultValueForKind kind
-                    , argDefinitions = ArgsDefinition args
-                    }
+            Just
+                { name = name
+                , kind = kind
+                , value = defaultValueForKind kind
+                , argDefinitions = ArgsDefinition args
+                }
 
         _ ->
             Nothing
@@ -218,7 +211,7 @@ parseQueryModel contentToJson sectionDefiningType (ResolvedSection section) =
             section.subsections
                 |> List.filterMap (parseFieldDefinitionFromTitleAndSection contentToJson sectionDefiningType)
     in
-        QueryModel fields
+    QueryModel fields
 
 
 resolveExpression : (String -> Maybe FieldDefinition) -> FieldKind -> String -> Maybe FieldValue
@@ -246,27 +239,20 @@ resolveExpression sourceFieldWithName kind expressionSource =
                 |> Result.toMaybe
                 |> Maybe.andThen (evaluateAsInt resolveIdentifier >> Result.toMaybe)
     in
-        case kind of
-            Int ->
-                Maybe.map IntValue maybeInt
+    case kind of
+        Int ->
+            Maybe.map IntValue maybeInt
 
-            _ ->
-                Nothing
+        _ ->
+            Nothing
 
 
 applyValuesToModel : (Content a -> Result e JsonValue) -> ResolvedSection e a -> QueryModel -> QueryModel
-applyValuesToModel contentToJson sectionWrapper model =
+applyValuesToModel contentToJson (ResolvedSection section) model =
     let
         contentInSection : ResolvedSection e a -> List (Result e (Content a))
-        contentInSection sectionWrapper =
-            case sectionWrapper of
-                ResolvedSection section ->
-                    section.mainContent
-
-        section =
-            case sectionWrapper of
-                ResolvedSection section ->
-                    section
+        contentInSection (ResolvedSection aSection) =
+            aSection.mainContent
 
         contentListForField : FieldDefinition -> Maybe (List (Result e (Content a)))
         contentListForField field =
@@ -283,44 +269,48 @@ applyValuesToModel contentToJson sectionWrapper model =
         jsonListToValue : FieldKind -> List JsonValue -> Maybe FieldValue
         jsonListToValue kind jsonList =
             case ( kind, jsonList ) of
-                ( String constraints, (JsonValue.StringValue ".empty") :: [] ) ->
+                ( String constraints, (Json.Value.StringValue ".empty") :: [] ) ->
                     Just <| StringValue (Ok <| Just "") constraints
 
-                ( String constraints, (JsonValue.StringValue s) :: [] ) ->
+                ( String constraints, (Json.Value.StringValue s) :: [] ) ->
                     case constraints.choices of
                         Just choices ->
                             if List.member s choices then
                                 Just <| StringValue (Ok <| Just s) constraints
+
                             else
                                 Just <| StringValue (Err <| NotInChoices s choices) constraints
 
                         Nothing ->
                             Just <| StringValue (Ok <| Just s) constraints
-                
-                ( StringsArray, (JsonValue.StringValue s) :: jsonList ) ->
+
+                ( StringsArray, (Json.Value.StringValue s) :: jsonListTail ) ->
                     let
                         strings =
-                            List.foldr (\v l ->
-                                case v of
-                                    JsonValue.StringValue s ->
-                                        s :: l
-                                    
-                                    _ ->
-                                        l
-                            ) [s] jsonList
-                    in
-                        Just <| StringsArrayValue strings
+                            List.foldr
+                                (\v l ->
+                                    case v of
+                                        Json.Value.StringValue nextString ->
+                                            nextString :: l
 
-                ( Bool, (JsonValue.BoolValue s) :: [] ) ->
+                                        _ ->
+                                            l
+                                )
+                                [ s ]
+                                jsonListTail
+                    in
+                    Just <| StringsArrayValue strings
+
+                ( Bool, (Json.Value.BoolValue s) :: [] ) ->
                     Just <| BoolValue s
 
-                ( Bool, (JsonValue.StringValue ".false") :: [] ) ->
+                ( Bool, (Json.Value.StringValue ".false") :: [] ) ->
                     Just <| BoolValue False
 
-                ( Bool, (JsonValue.StringValue ".true") :: [] ) ->
+                ( Bool, (Json.Value.StringValue ".true") :: [] ) ->
                     Just <| BoolValue True
 
-                ( kind, (JsonValue.StringValue s) :: [] ) ->
+                ( _, (Json.Value.StringValue s) :: [] ) ->
                     resolveExpression sourceFieldWithName kind s
 
                 _ ->
@@ -334,16 +324,16 @@ applyValuesToModel contentToJson sectionWrapper model =
                         |> Maybe.map (contentListToJsonList contentToJson)
                         |> Maybe.andThen (jsonListToValue field.kind)
             in
-                case maybeNewValue of
-                    Just value ->
-                        { field
-                            | value = value
-                        }
+            case maybeNewValue of
+                Just value ->
+                    { field
+                        | value = value
+                    }
 
-                    Nothing ->
-                        field
+                Nothing ->
+                    field
 
         fields =
             List.map updateField model.fields
     in
-        QueryModel fields
+    QueryModel fields

@@ -1,7 +1,4 @@
-module Datadown.Parse
-    exposing
-        ( parseDocument
-        )
+module Datadown.Parse exposing (parseDocument)
 
 {-| Parse Datadown documents
 
@@ -12,16 +9,17 @@ module Datadown.Parse
 
 -}
 
-import Datadown exposing (Document, Section(..), Content(..))
+import Datadown exposing (Content(..), Document, Section(..))
 import Dict
-import Regex exposing (Regex)
 import Markdown.Block as Block exposing (Block(..))
 import Markdown.Inline as Inline exposing (Inline(..))
+import Regex exposing (Regex)
 
 
 mustacheExpressionRegex : Regex
 mustacheExpressionRegex =
-    Regex.regex "{{[#/^]?([^}]*)}}"
+    Regex.fromString "{{[#/^]?([^}]*)}}"
+        |> Maybe.withDefault Regex.never
 
 
 listMustacheExpressions : String -> List String
@@ -33,8 +31,8 @@ listMustacheExpressions input =
                 |> List.head
                 |> Maybe.withDefault Nothing
     in
-        Regex.find Regex.All mustacheExpressionRegex input
-            |> List.filterMap extractor
+    Regex.find mustacheExpressionRegex input
+        |> List.filterMap extractor
 
 
 type alias ProcessedInlines a =
@@ -77,22 +75,22 @@ processContentBlock parseExpressions block =
                 _ ->
                     []
     in
-        case maybeText of
-            Just text ->
-                let
-                    expressionPairs : List ( String, a )
-                    expressionPairs =
-                        listMustacheExpressions text
-                            |> List.map (\s -> ( s, parseExpressions s ))
-                in
-                    { content = Datadown.Text text
-                    , expressionPairs = expressionPairs
-                    , urls = urls
-                    }
-                        |> Just
+    case maybeText of
+        Just text ->
+            let
+                expressionPairs : List ( String, a )
+                expressionPairs =
+                    listMustacheExpressions text
+                        |> List.map (\s -> ( s, parseExpressions s ))
+            in
+            { content = Datadown.Text text
+            , expressionPairs = expressionPairs
+            , urls = urls
+            }
+                |> Just
 
-            Nothing ->
-                Nothing
+        Nothing ->
+            Nothing
 
 
 addContentToSection : Content a -> List ( String, a ) -> List String -> Section a -> Section a
@@ -119,7 +117,7 @@ addContentToSection content expressions urls section =
                                     | subsections = updatedSubsection :: subsectionsTail
                                 }
                     in
-                        newSection
+                    newSection
 
 
 addContentToDocument : Content a -> List ( String, a ) -> List String -> Document a -> Document a
@@ -136,15 +134,16 @@ addContentToDocument content expressions urls document =
                 updatedSection =
                     addContentToSection content expressions urls section
             in
-                { document
-                    | sections = updatedSection :: sectionsTail
-                }
+            { document
+                | sections = updatedSection :: sectionsTail
+            }
 
 
 addSubsectionTo : Int -> Section a -> List (Section a) -> List (Section a)
 addSubsectionTo depthRemaining newSection sections =
     if depthRemaining == 0 then
         newSection :: sections
+
     else
         case sections of
             [] ->
@@ -161,7 +160,7 @@ addSubsectionTo depthRemaining newSection sections =
                                 | subsections = updatedSubsections
                             }
                 in
-                    updatedSection :: sectionsTail
+                updatedSection :: sectionsTail
 
 
 addSubsectionToDocument : Section a -> Document a -> Document a
@@ -178,9 +177,9 @@ addSubsectionToDocument subsection document =
                             | subsections = subsection :: section.subsections
                         }
             in
-                { document
-                    | sections = updatedSection :: sectionsTail
-                }
+            { document
+                | sections = updatedSection :: sectionsTail
+            }
 
 
 sectionWithTitle : String -> Section a
@@ -214,9 +213,9 @@ parseMarkdownBlock parseExpressions block document =
                 updatedSections =
                     addSubsectionTo (level - 2) newSection document.sections
             in
-                { document
-                    | sections = updatedSections
-                }
+            { document
+                | sections = updatedSections
+            }
 
         Block.List listBlock items ->
             let
@@ -230,8 +229,10 @@ parseMarkdownBlock parseExpressions block document =
                         Datadown.Text text ->
                             if String.startsWith "[x] " text then
                                 ( Datadown.Text <| String.dropLeft 4 text, Datadown.Flag True )
+
                             else if String.startsWith "[ ] " text then
                                 ( Datadown.Text <| String.dropLeft 4 text, Datadown.Flag False )
+
                             else
                                 ( Datadown.Text text, Datadown.Always )
 
@@ -250,7 +251,7 @@ parseMarkdownBlock parseExpressions block document =
                     contentAndExpressions
                         |> List.concatMap .urls
             in
-                addContentToDocument (Datadown.List contentItems) expressions urls document
+            addContentToDocument (Datadown.List contentItems) expressions urls document
 
         BlockQuote blocks ->
             let
@@ -258,12 +259,12 @@ parseMarkdownBlock parseExpressions block document =
                 innerDocument =
                     parseMarkdown parseExpressions blocks
             in
-                addContentToDocument (Datadown.Quote innerDocument) [] [] document
+            addContentToDocument (Datadown.Quote innerDocument) [] [] document
 
         CodeBlock codeBlock text ->
             let
-                expressionPairsFor text =
-                    listMustacheExpressions text
+                expressionPairsFor inputText =
+                    listMustacheExpressions inputText
                         |> List.map (\s -> ( s, parseExpressions s ))
 
                 ( content, expressionPairs ) =
@@ -279,7 +280,7 @@ parseMarkdownBlock parseExpressions block document =
                         _ ->
                             ( Code Nothing text, expressionPairsFor text )
             in
-                addContentToDocument content expressionPairs [] document
+            addContentToDocument content expressionPairs [] document
 
         _ ->
             case processContentBlock parseExpressions block of
@@ -319,9 +320,9 @@ parseMarkdown parseExpressions blocks =
                         |> List.reverse
             }
     in
-        blocks
-            |> List.foldl (parseMarkdownBlock parseExpressions) initialDocument
-            |> postDocument
+    blocks
+        |> List.foldl (parseMarkdownBlock parseExpressions) initialDocument
+        |> postDocument
 
 
 {-| Parses a Datadown document

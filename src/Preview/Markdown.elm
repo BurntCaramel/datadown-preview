@@ -1,7 +1,4 @@
-module Preview.Markdown
-    exposing
-        ( view
-        )
+module Preview.Markdown exposing (view)
 
 {-| Preview Markdown
 
@@ -12,8 +9,8 @@ module Preview.Markdown
 
 -}
 
-import Markdown
 import Html exposing (..)
+import Markdown
 
 
 {-| Previews a Markdown string as HTML

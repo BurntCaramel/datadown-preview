@@ -1,14 +1,7 @@
-module Datadown.Rpc
-    exposing
-        ( Rpc
-        , Id
-        , Response
-        , Error
-        , fromJsonValue
-        , graphQL
-        , toCommand
-        , errorToJsonValue
-        )
+module Datadown.Rpc exposing
+    ( Rpc, Id, Response, Error
+    , errorToJsonValue, fromJsonValue, graphQL, toCommand
+    )
 
 {-| Rpc
 
@@ -20,9 +13,9 @@ module Datadown.Rpc
 -}
 
 import Dict
-import JsonValue exposing (JsonValue)
-import Json.Encode
 import Http
+import Json.Encode
+import Json.Value exposing (JsonValue)
 import Platform.Cmd exposing (Cmd)
 
 
@@ -65,7 +58,7 @@ Requires fields "method" and "id", optionally "params".
 fromJsonValue : JsonValue -> Maybe (Rpc String)
 fromJsonValue json =
     case json of
-        JsonValue.ObjectValue pairs ->
+        Json.Value.ObjectValue pairs ->
             let
                 dict =
                     Dict.fromList pairs
@@ -75,7 +68,7 @@ fromJsonValue json =
 
                 maybeMethod =
                     case Dict.get "method" dict of
-                        Just (JsonValue.StringValue value) ->
+                        Just (Json.Value.StringValue value) ->
                             Just value
 
                         _ ->
@@ -86,21 +79,21 @@ fromJsonValue json =
 
                 maybeId =
                     case Dict.get "id" dict of
-                        Just (JsonValue.StringValue value) ->
+                        Just (Json.Value.StringValue value) ->
                             Just value
 
-                        Just (JsonValue.NumericValue value) ->
-                            Just <| toString value
+                        Just (Json.Value.NumericValue value) ->
+                            Just <| String.fromFloat value
 
                         _ ->
                             Nothing
             in
-                case ( hasVersion, maybeMethod, maybeId ) of
-                    ( True, Just method, Just id ) ->
-                        Just <| Rpc method maybeParams id
+            case ( hasVersion, maybeMethod, maybeId ) of
+                ( True, Just method, Just id ) ->
+                    Just <| Rpc method maybeParams id
 
-                    _ ->
-                        Nothing
+                _ ->
+                    Nothing
 
         _ ->
             Nothing
@@ -110,22 +103,22 @@ graphQL : String -> Rpc String
 graphQL queryString =
     let
         params =
-            [ ( "query", JsonValue.StringValue queryString )
+            [ ( "query", Json.Value.StringValue queryString )
             ]
-                |> JsonValue.ObjectValue
+                |> Json.Value.ObjectValue
     in
-        Rpc "graphql" (Just params) queryString
+    Rpc "graphql" (Just params) queryString
 
 
 getParam : List String -> Rpc String -> Maybe JsonValue
 getParam path rpc =
-    Maybe.andThen (JsonValue.getIn path >> Result.toMaybe) rpc.params
+    Maybe.andThen (Json.Value.getIn path >> Result.toMaybe) rpc.params
 
 
 requireString : JsonValue -> Maybe String
 requireString json =
     case json of
-        JsonValue.StringValue value ->
+        Json.Value.StringValue value ->
             Just value
 
         _ ->
@@ -145,10 +138,10 @@ convertError httpError =
             Error 0 "Unable to connect" Nothing
 
         Http.BadStatus r ->
-            Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)
+            Error r.status.code r.status.message (Just <| Json.Value.StringValue r.body)
 
         Http.BadPayload message r ->
-            Error r.status.code r.status.message (Just <| JsonValue.StringValue r.body)
+            Error r.status.code r.status.message (Just <| Json.Value.StringValue r.body)
 
 
 convertResult : Rpc String -> Result Http.Error JsonValue -> Response
@@ -158,7 +151,7 @@ convertResult rpc httpResult =
             httpResult
                 |> Result.mapError convertError
     in
-        Response rpc.id result
+    Response rpc.id result
 
 
 toCommand : (Response -> msg) -> Rpc String -> Maybe (Cmd msg)
@@ -170,14 +163,14 @@ toCommand toMessage rpc =
                     getParam [ "url" ] rpc
                         |> Maybe.andThen requireString
             in
-                case maybeUrl of
-                    Just url ->
-                        Http.get url JsonValue.decoder
-                            |> Http.send (convertResult rpc >> toMessage)
-                            |> Just
+            case maybeUrl of
+                Just url ->
+                    Http.get url Json.Value.decoder
+                        |> Http.send (convertResult rpc >> toMessage)
+                        |> Just
 
-                    _ ->
-                        Nothing
+                _ ->
+                    Nothing
 
         "graphql" ->
             let
@@ -186,27 +179,27 @@ toCommand toMessage rpc =
 
                 url =
                     case getParam [ "url" ] rpc of
-                        Just (JsonValue.StringValue s) ->
+                        Just (Json.Value.StringValue s) ->
                             s
 
                         _ ->
                             "https://1.source.collected.design/graphql"
             in
-                case maybeQuery of
-                    Just (JsonValue.StringValue queryString) ->
-                        let
-                            body =
-                                [ ( "query", Json.Encode.string queryString ) ]
-                                    |> Json.Encode.object
-                                    |> Json.Encode.encode 0
-                                    |> Http.stringBody "application/json"
-                        in
-                            Http.post url body JsonValue.decoder
-                                |> Http.send (convertResult rpc >> toMessage)
-                                |> Just
+            case maybeQuery of
+                Just (Json.Value.StringValue queryString) ->
+                    let
+                        body =
+                            [ ( "query", Json.Encode.string queryString ) ]
+                                |> Json.Encode.object
+                                |> Json.Encode.encode 0
+                                |> Http.stringBody "application/json"
+                    in
+                    Http.post url body Json.Value.decoder
+                        |> Http.send (convertResult rpc >> toMessage)
+                        |> Just
 
-                    _ ->
-                        Nothing
+                _ ->
+                    Nothing
 
         _ ->
             Nothing
@@ -214,9 +207,9 @@ toCommand toMessage rpc =
 
 errorToJsonValue : Error -> JsonValue
 errorToJsonValue error =
-    [ Just ( "code", JsonValue.NumericValue <| toFloat error.code )
-    , Just ( "message", JsonValue.StringValue error.message )
-    , Maybe.map ((,) "data") error.data
+    [ Just ( "code", Json.Value.NumericValue <| toFloat error.code )
+    , Just ( "message", Json.Value.StringValue error.message )
+    , Maybe.map (\b -> ( "data", b )) error.data
     ]
         |> List.filterMap identity
-        |> JsonValue.ObjectValue
+        |> Json.Value.ObjectValue

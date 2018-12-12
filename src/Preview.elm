@@ -1,7 +1,4 @@
-module Preview
-    exposing
-        ( view
-        )
+module Preview exposing (view)
 
 {-| Preview code snippets
 
@@ -14,9 +11,9 @@ module Preview
 
 import Dict exposing (Dict)
 import Html exposing (Html, text)
+import Preview.Csv
 import Preview.Html
 import Preview.Json
-import Preview.Csv
 import Preview.Markdown
 
 
@@ -42,13 +39,13 @@ languageToView language =
 view : Maybe String -> String -> Maybe (Html msg)
 view maybeLanguage source =
     let
-        maybeView =
+        maybeSpecificView =
             maybeLanguage
                 |> Maybe.andThen languageToView
     in
-        case maybeView of
-            Just view ->
-                Just <| view source
+    case maybeSpecificView of
+        Just specificView ->
+            Just <| specificView source
 
-            Nothing ->
-                Nothing
+        Nothing ->
+            Nothing

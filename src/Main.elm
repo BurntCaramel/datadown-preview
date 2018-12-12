@@ -1,31 +1,32 @@
 module Main exposing (main)
 
-import Html exposing (..)
-import Navigation exposing (Location)
-import Html.Attributes exposing (class, id, rows, attribute, value, checked, type_, placeholder, disabled, href, style)
-import Html.Events exposing (onInput, onCheck, onClick)
-import Time exposing (Time)
-import Date
-import Dict exposing (Dict)
-import Set exposing (Set)
-import Task
-import Http
-import Routes exposing (Route(..), CollectionSource(..), EditMode(..), collectionSourceFor)
-import Datadown exposing (Document, Section(..), Content(..), sectionHasTitle)
-import Datadown.Parse exposing (parseDocument)
-import Datadown.Process as Process exposing (processDocument, Error, Resolved, ResolvedSection(..))
-import Datadown.Rpc exposing (Rpc)
-import Datadown.QueryModel as QueryModel
+import Browser exposing (UrlRequest)
+import Browser.Navigation as Navigation
+import Datadown exposing (Content(..), Document, Section(..), sectionHasTitle)
 import Datadown.MutationModel as MutationModel
-import JsonValue exposing (JsonValue(..))
-import Parser exposing (Error)
-import Preview
-import Preview.Json
-import Preview.Decorate
-import Expressions.Tokenize as Tokenize exposing (tokenize, Token(..))
+import Datadown.Parse exposing (parseDocument)
+import Datadown.Process as Process exposing (Error, Resolved, ResolvedSection(..), processDocument)
+import Datadown.QueryModel as QueryModel
+import Datadown.Rpc exposing (Rpc)
+import Dict exposing (Dict)
 import Expressions.Evaluate as Evaluate exposing (evaluateTokenLines)
+import Expressions.Tokenize as Tokenize exposing (Token(..), tokenize)
+import Html exposing (..)
+import Html.Attributes exposing (attribute, checked, class, disabled, href, id, placeholder, rows, style, type_, value)
+import Html.Events exposing (onCheck, onClick, onInput)
+import Http
+import Json.Value exposing (JsonValue(..))
+import Parser
+import Preview
+import Preview.Decorate
+import Preview.Json
+import Routes exposing (CollectionSource(..), EditMode(..), Route(..), collectionSourceFor)
 import Samples
 import Services.CollectedSource
+import Set exposing (Set)
+import Task
+import Time
+import Url exposing (Url)
 
 
 type alias Expressions =
@@ -42,8 +43,9 @@ type alias Model =
     , parsedDocuments : Dict String (Document Expressions)
     , processedDocuments : Dict String (Resolved Evaluate.Error Expressions)
     , route : Route
+    , navKey : Navigation.Key
     , sourceStatuses : Dict Routes.CollectionSourceId SourceStatus
-    , now : Time
+    , now : Time.Posix
     , sectionInputs : Dict String JsonValue
     , rpcResponses : Dict Datadown.Rpc.Id (Maybe Datadown.Rpc.Response)
     , mutationHistory : List String
@@ -51,9 +53,9 @@ type alias Model =
 
 
 type Error
-    = Parser Parser.Error
+    = Parser (List Parser.DeadEnd)
     | Evaluate Evaluate.Error
-    | Process Process.Error
+    -- | Process (Process.Error e)
 
 
 type alias DisplayOptions =
@@ -79,41 +81,41 @@ parseExpressions input =
 
 builtInValueFromModel : Model -> String -> Maybe JsonValue
 builtInValueFromModel model key =
-    case key of
-        "time:seconds" ->
-            model.now
-                |> Time.inSeconds
-                |> floor
-                |> toFloat
-                |> JsonValue.NumericValue
-                >> Just
+    let
+        zone =
+            Time.utc  
+    in
+        case key of
+            "time:seconds" ->
+                model.now
+                    |> Time.toSecond zone
+                    |> toFloat
+                    |> Json.Value.NumericValue
+                    >> Just
 
-        "now.date.s" ->
-            model.now
-                |> Date.fromTime
-                |> Date.second
-                |> toFloat
-                |> JsonValue.NumericValue
-                >> Just
+            "now.date.s" ->
+                model.now
+                    |> Time.toSecond zone
+                    |> toFloat
+                    |> Json.Value.NumericValue
+                    >> Just
 
-        "now.date.m" ->
-            model.now
-                |> Date.fromTime
-                |> Date.minute
-                |> toFloat
-                |> JsonValue.NumericValue
-                >> Just
+            "now.date.m" ->
+                model.now
+                    |> Time.toMinute zone
+                    |> toFloat
+                    |> Json.Value.NumericValue
+                    >> Just
 
-        "now.date.h" ->
-            model.now
-                |> Date.fromTime
-                |> Date.hour
-                |> toFloat
-                |> JsonValue.NumericValue
-                >> Just
+            "now.date.h" ->
+                model.now
+                    |> Time.toHour zone
+                    |> toFloat
+                    |> Json.Value.NumericValue
+                    >> Just
 
-        _ ->
-            Nothing
+            _ ->
+                Nothing
 
 
 evaluateExpressions : Model -> (String -> Result (Process.Error Evaluate.Error) JsonValue) -> Result Error (List (List Token)) -> Result Evaluate.Error JsonValue
@@ -136,7 +138,7 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
         resolveWithModel : String -> Result (Process.Error Evaluate.Error) JsonValue
         resolveWithModel key =
             case Dict.get key model.sectionInputs of
-                Just (JsonValue.StringValue "") ->
+                Just (Json.Value.StringValue "") ->
                     defaultResolveWithModel key
 
                 Just value ->
@@ -145,12 +147,12 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
                 Nothing ->
                     defaultResolveWithModel key
     in
-        case parsedExpressions of
-            Err error ->
-                Err <| Evaluate.Parsing (toString error)
+    case parsedExpressions of
+        Err error ->
+            Err <| Evaluate.Parsing (Debug.toString error)
 
-            Ok expressions ->
-                evaluateTokenLines resolveWithModel expressions
+        Ok expressions ->
+            evaluateTokenLines resolveWithModel expressions
 
 
 valueForRpcID : Model -> String -> List String -> JsonValue -> Result Evaluate.Error JsonValue
@@ -159,47 +161,47 @@ valueForRpcID model id keyPath json =
         maybeMaybeResponse =
             Dict.get id model.rpcResponses
     in
-        case keyPath of
-            "params" :: otherKeys ->
-                json
-                    |> JsonValue.getIn keyPath
-                    >> Result.mapError Evaluate.NoValueForIdentifier
+    case keyPath of
+        "params" :: otherKeys ->
+            json
+                |> Json.Value.getIn keyPath
+                >> Result.mapError Evaluate.NoValueForIdentifier
 
-            "result" :: otherKeys ->
-                case maybeMaybeResponse of
-                    Just (Just response) ->
-                        response.result
-                            |> Result.mapError Evaluate.Rpc
-                            |> Result.andThen (JsonValue.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
+        "result" :: otherKeys ->
+            case maybeMaybeResponse of
+                Just (Just response) ->
+                    response.result
+                        |> Result.mapError Evaluate.Rpc
+                        |> Result.andThen (Json.Value.getIn otherKeys >> Result.mapError Evaluate.NoValueForIdentifier)
 
-                    _ ->
-                        Ok (JsonValue.NullValue)
+                _ ->
+                    Ok Json.Value.NullValue
 
-            "error" :: otherKeys ->
-                case maybeMaybeResponse of
-                    Just (Just response) ->
-                        case response.result of
-                            Err error ->
-                                error
-                                    |> Datadown.Rpc.errorToJsonValue
-                                    |> JsonValue.getIn otherKeys
-                                    >> Result.mapError Evaluate.NoValueForIdentifier
+        "error" :: otherKeys ->
+            case maybeMaybeResponse of
+                Just (Just response) ->
+                    case response.result of
+                        Err error ->
+                            error
+                                |> Datadown.Rpc.errorToJsonValue
+                                |> Json.Value.getIn otherKeys
+                                >> Result.mapError Evaluate.NoValueForIdentifier
 
-                            _ ->
-                                Ok (JsonValue.NullValue)
+                        _ ->
+                            Ok Json.Value.NullValue
 
-                    _ ->
-                        Ok (JsonValue.NullValue)
+                _ ->
+                    Ok Json.Value.NullValue
 
-            _ ->
-                Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
+        _ ->
+            Err (Evaluate.NoValueForIdentifier (String.join "." keyPath))
 
 
 contentToJson : Model -> Content Expressions -> Result Evaluate.Error JsonValue
 contentToJson model content =
     case content of
         Text text ->
-            Ok <| JsonValue.StringValue text
+            Ok <| Json.Value.StringValue text
 
         Json json ->
             Ok json
@@ -214,13 +216,13 @@ contentToJson model content =
 
         List items ->
             items
-                |> List.filterMap (Tuple.first >> (contentToJson model) >> Result.toMaybe)
-                |> JsonValue.ArrayValue
+                |> List.filterMap (Tuple.first >> contentToJson model >> Result.toMaybe)
+                |> Json.Value.ArrayValue
                 |> Ok
 
         Code maybeLanguage source ->
             String.trim source
-                |> JsonValue.StringValue
+                |> Json.Value.StringValue
                 |> Ok
 
         Reference id keyPath json ->
@@ -251,10 +253,10 @@ modelWithDocumentProcessed key model =
                 processedDocuments =
                     Dict.insert key processed model.processedDocuments
             in
-                { model
-                    | parsedDocuments = parsedDocuments
-                    , processedDocuments = processedDocuments
-                }
+            { model
+                | parsedDocuments = parsedDocuments
+                , processedDocuments = processedDocuments
+            }
 
         Nothing ->
             model
@@ -270,11 +272,11 @@ modelWithCurrentDocumentProcessed model =
             model
 
 
-init : Flags -> Location -> ( Model, Cmd Message )
-init flags location =
+init : Flags -> Url -> Navigation.Key -> ( Model, Cmd Message )
+init flags url navKey =
     let
         route =
-            Routes.parseLocation location
+            Routes.parseUrl url
 
         ( sourceStatuses, documentSources, commands ) =
             case collectionSourceFor route of
@@ -304,24 +306,29 @@ init flags location =
             , parsedDocuments = Dict.empty
             , processedDocuments = Dict.empty
             , route = route
+            , navKey = navKey
             , sourceStatuses = sourceStatuses
-            , now = 0
+            , now = Time.millisToPosix 0
             , sectionInputs = Dict.empty
             , rpcResponses = Dict.empty
             , mutationHistory = []
             }
-                |> case route of
-                    CollectionItem _ key _ ->
-                        modelWithDocumentProcessed key
+                |> (case route of
+                        CollectionItem _ key _ ->
+                            modelWithDocumentProcessed key
 
-                    _ ->
-                        identity
+                        _ ->
+                            identity
+                   )
     in
-        model ! commands
+    ( model
+    , Cmd.batch commands
+    )
 
 
 type Message
-    = NavigateTo Location
+    = NavigateTo Browser.UrlRequest
+    | UrlChanged Url
     | ChangeDocumentSource String
     | GoToDocumentsList
     | GoToPreviousDocument
@@ -330,7 +337,7 @@ type Message
     | GoToContentSources CollectionSource
     | NewDocument
     | ChangeSectionInput String JsonValue
-    | Time Time
+    | Time Time.Posix
     | BeginLoading
     | BeginRpcWithID String Bool
     | RpcResponded Datadown.Rpc.Response
@@ -342,7 +349,10 @@ update : Message -> Model -> ( Model, Cmd Message )
 update msg model =
     case msg of
         NavigateTo location ->
-            model ! []
+            ( model , Cmd.none )
+        
+        UrlChanged url ->
+            ( model , Cmd.none )
 
         ChangeDocumentSource newInput ->
             let
@@ -354,13 +364,15 @@ update msg model =
                                     model.documentSources
                                         |> Dict.insert key newInput
                             in
-                                { model | documentSources = documentSources }
-                                    |> modelWithDocumentProcessed key
+                            { model | documentSources = documentSources }
+                                |> modelWithDocumentProcessed key
 
                         _ ->
                             model
             in
-                newModel ! []
+            ( newModel
+            , Cmd.none
+            )
 
         GoToDocumentsList ->
             let
@@ -375,19 +387,21 @@ update msg model =
                         _ ->
                             Landing
             in
-                { model | route = route } ! [ Navigation.modifyUrl <| Routes.toPath route ]
+            ( { model | route = route }
+            , Navigation.pushUrl model.navKey <| Routes.toPath route
+            )
 
         GoToPreviousDocument ->
             case model.route of
                 CollectionItem collection key editMode ->
                     case String.toInt key of
-                        Ok index ->
+                        Just index ->
                             let
                                 newIndex =
                                     max 0 (index - 1)
 
                                 newKey =
-                                    toString newIndex
+                                    String.fromInt newIndex
 
                                 newRoute =
                                     CollectionItem collection newKey editMode
@@ -396,19 +410,23 @@ update msg model =
                                     { model | route = newRoute }
                                         |> modelWithDocumentProcessed newKey
                             in
-                                newModel ! [ Navigation.modifyUrl <| Routes.toPath newRoute ]
+                            ( newModel
+                            , Navigation.pushUrl model.navKey <| Routes.toPath newRoute
+                            )
 
-                        _ ->
-                            model ! []
+                        Nothing ->
+                            ( model , Cmd.none )
 
                 _ ->
-                    model ! []
+                    ( model
+                    , Cmd.none
+                    )
 
         GoToNextDocument ->
             case model.route of
                 CollectionItem collection key editMode ->
                     case String.toInt key of
-                        Ok index ->
+                        Just index ->
                             let
                                 maxIndex =
                                     Dict.size model.documentSources - 1
@@ -417,7 +435,7 @@ update msg model =
                                     min maxIndex (index + 1)
 
                                 newKey =
-                                    toString newIndex
+                                    String.fromInt newIndex
 
                                 newRoute =
                                     CollectionItem collection newKey editMode
@@ -426,13 +444,17 @@ update msg model =
                                     { model | route = newRoute }
                                         |> modelWithDocumentProcessed newKey
                             in
-                                newModel ! [ Navigation.modifyUrl <| Routes.toPath newRoute ]
+                            ( newModel
+                            , Navigation.pushUrl model.navKey <| Routes.toPath newRoute
+                            )
 
-                        _ ->
-                            model ! []
+                        Nothing ->
+                            ( model, Cmd.none )
 
                 _ ->
-                    model ! []
+                    ( model
+                    , Cmd.none
+                    )
 
         GoToDocumentWithKey collection key ->
             let
@@ -443,7 +465,9 @@ update msg model =
                     { model | route = newRoute }
                         |> modelWithDocumentProcessed key
             in
-                newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
+            ( newModel
+            , Navigation.pushUrl model.navKey (Routes.toPath newRoute)
+            )
 
         GoToContentSources collection ->
             let
@@ -453,19 +477,17 @@ update msg model =
                 newModel =
                     { model | route = newRoute }
             in
-                newModel ! [ Navigation.modifyUrl (Routes.toPath newRoute) ]
+            ( newModel
+            , Navigation.pushUrl model.navKey (Routes.toPath newRoute)
+            )
 
         NewDocument ->
             let
                 currentIndex =
                     case model.route of
                         CollectionItem collection key editMode ->
-                            case String.toInt key of
-                                Ok index ->
-                                    index
-
-                                _ ->
-                                    0
+                            String.toInt key
+                                |> Maybe.withDefault 0
 
                         _ ->
                             0
@@ -477,12 +499,13 @@ update msg model =
                     model.documentSources
                         |> Dict.insert "new" newDocumentSource
             in
-                { model
-                    | documentSources = documentSources
-                    , parsedDocuments = Dict.empty
-                    , processedDocuments = Dict.empty
-                }
-                    ! []
+            ( { model
+                | documentSources = documentSources
+                , parsedDocuments = Dict.empty
+                , processedDocuments = Dict.empty
+              }
+            , Cmd.none
+            )
 
         ChangeSectionInput sectionTitle newValue ->
             let
@@ -498,7 +521,9 @@ update msg model =
                 newModel =
                     { model | sectionInputs = newSectionInputs }
             in
-                modelWithCurrentDocumentProcessed newModel ! []
+            ( modelWithCurrentDocumentProcessed newModel
+            , Cmd.none
+            )
 
         Time time ->
             let
@@ -522,34 +547,35 @@ update msg model =
                                                 Nothing ->
                                                     Nothing
                             in
-                                case maybeParsed of
-                                    Just ( cached, parsed ) ->
-                                        let
-                                            processed =
-                                                processDocumentWithModel model parsed
+                            case maybeParsed of
+                                Just ( cached, parsed ) ->
+                                    let
+                                        processed =
+                                            processDocumentWithModel model parsed
 
-                                            parsedDocuments =
-                                                if cached then
-                                                    model.parsedDocuments
-                                                else
-                                                    Dict.insert key parsed model.parsedDocuments
+                                        parsedDocuments =
+                                            if cached then
+                                                model.parsedDocuments
 
-                                            processedDocuments =
-                                                Dict.insert key processed model.processedDocuments
-                                        in
-                                            { model
-                                                | parsedDocuments = parsedDocuments
-                                                , processedDocuments = processedDocuments
-                                                , now = time
-                                            }
+                                            else
+                                                Dict.insert key parsed model.parsedDocuments
 
-                                    Nothing ->
-                                        model
+                                        processedDocuments =
+                                            Dict.insert key processed model.processedDocuments
+                                    in
+                                    { model
+                                        | parsedDocuments = parsedDocuments
+                                        , processedDocuments = processedDocuments
+                                        , now = time
+                                    }
+
+                                Nothing ->
+                                    model
 
                         _ ->
                             model
             in
-                ( newModel, Cmd.none )
+            ( newModel, Cmd.none )
 
         BeginLoading ->
             let
@@ -562,10 +588,8 @@ update msg model =
                             Nothing
 
                 rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List (Rpc String)
-                rpcsFromSection ( title, section ) =
-                    case section of
-                        ResolvedSection { rpcs } ->
-                            rpcs
+                rpcsFromSection ( title, ResolvedSection section ) =
+                    section.rpcs
 
                 rpcs =
                     case maybeResolvedDocument of
@@ -591,7 +615,7 @@ update msg model =
 
                 emptyResponses =
                     List.repeat (List.length ids) Nothing
-                        |> List.map2 (,) ids
+                        |> List.map2 (\a b -> ( a, b )) ids
                         |> Dict.fromList
 
                 rpcResponses =
@@ -601,7 +625,9 @@ update msg model =
                 newModel =
                     modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses }
             in
-                newModel ! commands
+            ( newModel
+            , Cmd.batch commands
+            )
 
         BeginRpcWithID id reload ->
             let
@@ -614,10 +640,8 @@ update msg model =
                             Nothing
 
                 rpcsFromSection : ( String, ResolvedSection (Process.Error Evaluate.Error) Expressions ) -> List (Rpc String)
-                rpcsFromSection ( title, section ) =
-                    case section of
-                        ResolvedSection { rpcs } ->
-                            rpcs
+                rpcsFromSection ( title, ResolvedSection section ) =
+                    section.rpcs
 
                 rpcs =
                     case maybeResolvedDocument of
@@ -633,28 +657,36 @@ update msg model =
                         |> List.filter (\rpc -> rpc.id == id)
                         |> List.head
             in
-                case maybeRpc of
-                    Just rpc ->
-                        case Datadown.Rpc.toCommand RpcResponded rpc of
-                            Just command ->
-                                let
-                                    rpcResponses =
-                                        Dict.insert id Nothing model.rpcResponses
-                                in
-                                    modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! [ command ]
+            case maybeRpc of
+                Just rpc ->
+                    case Datadown.Rpc.toCommand RpcResponded rpc of
+                        Just command ->
+                            let
+                                rpcResponses =
+                                    Dict.insert id Nothing model.rpcResponses
+                            in
+                            ( modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses }
+                            , command
+                            )
 
-                            Nothing ->
-                                model ! []
+                        Nothing ->
+                            ( model
+                            , Cmd.none
+                            )
 
-                    Nothing ->
-                        model ! []
+                Nothing ->
+                    ( model
+                    , Cmd.none
+                    )
 
         RpcResponded response ->
             let
                 rpcResponses =
                     Dict.insert response.id (Just response) model.rpcResponses
             in
-                modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses } ! []
+            ( modelWithCurrentDocumentProcessed { model | rpcResponses = rpcResponses }
+            , Cmd.none
+            )
 
         LoadedGitHubComponents owner repo branch result ->
             case result of
@@ -670,26 +702,28 @@ update msg model =
                                 |> Dict.insert (GitHubRepo owner repo branch |> Routes.collectionSourceToId)
                                     Loaded
                     in
-                        { model
-                            | documentSources = documentSources
-                            , sourceStatuses = sourceStatuses
-                        }
-                            ! []
+                    ( { model
+                        | documentSources = documentSources
+                        , sourceStatuses = sourceStatuses
+                      }
+                    , Cmd.none
+                    )
 
                 Err error ->
-                    Debug.crash "Error!"
+                    Debug.todo "Error loading GitHub components!"
 
         RunMutation name ->
-            { model
+            ( { model
                 | mutationHistory = name :: model.mutationHistory
-            }
-                ! []
+              }
+            , Cmd.none
+            )
 
 
 subscriptions : Model -> Sub Message
 subscriptions model =
     Sub.batch
-        [ Time.every Time.second Time
+        [ Time.every 1000 Time
         ]
 
 
@@ -705,13 +739,14 @@ col =
 
 buttonStyle : String -> Html.Attribute msg
 buttonStyle color =
-    class <| "inline-block px-4 py-2 text-bold no-underline text-white bg-" ++  color ++ " rounded"
+    class <| "inline-block px-4 py-2 text-bold no-underline text-white bg-" ++ color ++ " rounded"
 
 
 open : Bool -> Html.Attribute msg
 open flag =
     if flag then
         attribute "open" ""
+
     else
         class ""
 
@@ -723,13 +758,13 @@ viewExpressionToken token =
             div [] [ text identifier ]
 
         Value value ->
-            div [] [ text (toString value) ]
+            div [] [ text (Debug.toString value) ]
 
         Operator operator ->
-            div [] [ text (toString operator) ]
+            div [] [ text (Debug.toString operator) ]
 
-        Url url ->
-            div [] [ text (toString url) ]
+        Tokenize.Url url ->
+            div [] [ text (Debug.toString url) ]
 
 
 viewExpression : List Token -> Html Message
@@ -764,18 +799,19 @@ viewCode options maybeLanguage source =
         sourceIsOpen =
             maybePreviewHtml == Nothing
     in
-        if not options.compact && showCodeForLanguage maybeLanguage then
-            div []
-                [ div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
-                , details [ class "mt-2", open sourceIsOpen ]
-                    [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker border border-purple-lightest cursor-pointer" ]
-                        [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
-                    , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
-                        [ code [ class "font-mono text-xs" ] [ text source ] ]
-                    ]
+    if not options.compact && showCodeForLanguage maybeLanguage then
+        div []
+            [ div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
+            , details [ class "mt-2", open sourceIsOpen ]
+                [ summary [ class "px-2 py-1 font-mono text-xs italic text-purple-darker border border-purple-lightest cursor-pointer" ]
+                    [ text ("Source" ++ (Maybe.map ((++) " ") maybeLanguage |> Maybe.withDefault "")) ]
+                , pre [ class "overflow-auto px-2 py-2 text-purple-darker bg-purple-lightest" ]
+                    [ code [ class "font-mono text-xs" ] [ text source ] ]
                 ]
-        else
-            div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
+            ]
+
+    else
+        div [] [ maybePreviewHtml |> Maybe.withDefault (text "") ]
 
 
 viewRpc : Rpc String -> Maybe (Maybe Datadown.Rpc.Response) -> Html Message
@@ -801,35 +837,35 @@ viewRpc rpc maybeResponse =
                             let
                                 statusText =
                                     [ "Error:"
-                                    , toString error.code
+                                    , String.fromInt error.code
                                     , error.message
                                     ]
                                         |> String.join " "
                             in
-                                ( "bg-red-lighter", span [ class "summary-indicator-inline" ] [ text statusText ], Maybe.map Preview.Json.viewJson error.data )
+                            ( "bg-red-lighter", span [ class "summary-indicator-inline" ] [ text statusText ], Maybe.map Preview.Json.viewJson error.data )
     in
-        div []
-            [ details []
-                [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic text-white bg-grey-darker cursor-pointer" ]
-                    [ span [ class "pr-2 summary-indicator-inline" ] [ text rpc.method ]
-                    , span [] [ text rpc.id ]
-                    ]
-                , rpc.params
-                    |> Maybe.map Preview.Json.viewJson
-                    |> Maybe.withDefault (text "")
+    div []
+        [ details []
+            [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic text-white bg-grey-darker cursor-pointer" ]
+                [ span [ class "pr-2 summary-indicator-inline" ] [ text rpc.method ]
+                , span [] [ text rpc.id ]
                 ]
-            , case maybeResponseHtml of
-                Just responseHtml ->
-                    details []
-                        [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
-                            [ responseStatusHtml ]
-                        , responseHtml
-                        ]
-
-                Nothing ->
-                    div [ class "flex justify-between px-2 py-1 font-mono text-xs italic", class loadingClasses ]
-                        [ responseStatusHtml ]
+            , rpc.params
+                |> Maybe.map Preview.Json.viewJson
+                |> Maybe.withDefault (text "")
             ]
+        , case maybeResponseHtml of
+            Just responseHtml ->
+                details []
+                    [ summary [ class "flex justify-between px-2 py-1 font-mono text-xs italic cursor-pointer", class loadingClasses ]
+                        [ responseStatusHtml ]
+                    , responseHtml
+                    ]
+
+            Nothing ->
+                div [ class "flex justify-between px-2 py-1 font-mono text-xs italic", class loadingClasses ]
+                    [ responseStatusHtml ]
+        ]
 
 
 viewContent : DisplayOptions -> Content (Result Error (List (List Token))) -> Html Message
@@ -843,10 +879,10 @@ viewContent options content =
                 rpc =
                     Datadown.Rpc.graphQL query
             in
-                div []
-                    [ viewCode options (Just "graphql") query
-                    , viewRpc rpc (options.getRpcResponse rpc.id)
-                    ]
+            div []
+                [ viewCode options (Just "graphql") query
+                , viewRpc rpc (options.getRpcResponse rpc.id)
+                ]
 
         Code language source ->
             viewCode options language source
@@ -856,17 +892,17 @@ viewContent options content =
                 maybeRpc =
                     Datadown.Rpc.fromJsonValue json
             in
-                case maybeRpc of
-                    Just rpc ->
-                        viewRpc rpc (options.getRpcResponse rpc.id)
+            case maybeRpc of
+                Just rpc ->
+                    viewRpc rpc (options.getRpcResponse rpc.id)
 
-                    Nothing ->
-                        Preview.Json.viewJson json
+                Nothing ->
+                    Preview.Json.viewJson json
 
         Expressions expressionsResult ->
             case expressionsResult of
                 Err expressionsError ->
-                    h3 [ class "px-2 py-1 text-white bg-red-dark" ] [ text <| toString expressionsError ]
+                    h3 [ class "px-2 py-1 text-white bg-red-dark" ] [ text <| Debug.toString expressionsError ]
 
                 Ok expressions ->
                     pre [ class "px-2 py-2 text-teal-darker bg-teal-lightest" ]
@@ -880,13 +916,13 @@ viewContent options content =
                 resolved =
                     options.processDocument document
             in
-                resolved.sections
-                    |> List.map makeSectionViewModel
-                    |> List.map (viewSection [] options)
-                    |> div [ class "pl-6 border-l border-teal" ]
+            resolved.sections
+                |> List.map makeSectionViewModel
+                |> List.map (viewSection [] options)
+                |> div [ class "pl-6 border-l border-teal" ]
 
         Reference id keyPath json ->
-            div [] [ text "Reference: ", cite [] [ text <| toString id ] ]
+            div [] [ text "Reference: ", cite [] [ text <| Debug.toString id ] ]
 
 
 viewContentResult : DisplayOptions -> Result (Process.Error Evaluate.Error) (Content (Result Error (List (List Token)))) -> Html Message
@@ -895,7 +931,7 @@ viewContentResult options contentResult =
         Err error ->
             case error of
                 _ ->
-                    div [ class "mb-3 px-2 py-1 text-white bg-red-dark" ] [ text (toString error) ]
+                    div [ class "mb-3 px-2 py-1 text-white bg-red-dark" ] [ text (Debug.toString error) ]
 
         Ok content ->
             div [ class "mb-3" ] [ viewContent options content ]
@@ -913,133 +949,140 @@ viewContentResults options parentPath sectionTitle contentResults subsections =
         showEditor =
             if String.contains ":" sectionTitle then
                 True
+
             else if List.isEmpty contentResults then
                 not hasSubsections
+
             else
                 False
     in
-        if showNothing then
+    if showNothing then
+        []
+
+    else if showEditor then
+        let
+            ( baseTitle, kind ) =
+                case String.split ":" sectionTitle of
+                    head :: second :: rest ->
+                        ( head, String.trim second )
+
+                    head :: [] ->
+                        ( head, "text" )
+
+                    [] ->
+                        ( "", "" )
+
+            isSingular =
+                kind == "text"
+
+            key =
+                baseTitle
+                    :: parentPath
+                    |> List.reverse
+                    |> String.join "."
+
+            jsonToStrings json =
+                case json of
+                    StringValue s ->
+                        [ s ]
+
+                    NumericValue f ->
+                        [ String.fromFloat f ]
+
+                    BoolValue b ->
+                        if b then
+                            [ "✅" ]
+
+                        else
+                            [ "❎" ]
+
+                    ArrayValue items ->
+                        items
+                            |> List.concatMap jsonToStrings
+
+                    _ ->
+                        []
+
+            defaultValues : List String
+            defaultValues =
+                contentResults
+                    |> List.filterMap Result.toMaybe
+                    |> List.filterMap (options.contentToJson >> Result.toMaybe)
+                    |> List.concatMap jsonToStrings
+
+            choiceCount =
+                List.length defaultValues
+
+            stringValue =
+                case Dict.get key options.sectionInputs of
+                    Nothing ->
+                        if choiceCount > 1 then
+                            defaultValues |> List.head |> Maybe.withDefault ""
+
+                        else
+                            ""
+
+                    Just (StringValue s) ->
+                        s
+
+                    Just json ->
+                        if isSingular then
+                            jsonToStrings json |> List.head |> Maybe.withDefault ""
+
+                        else
+                            jsonToStrings json |> String.join "\n"
+
+            optionHtmlFor string =
+                option [ value string ] [ text string ]
+        in
+        if hasSubsections then
             []
-        else if showEditor then
+
+        else if kind == "bool" then
+            [ label
+                [ class "block" ]
+                [ input
+                    [ type_ "checkbox"
+                    , onCheck (Json.Value.BoolValue >> ChangeSectionInput key)
+                    ]
+                    []
+                , text " "
+                , text baseTitle
+                ]
+            ]
+
+        else if choiceCount > 1 then
+            [ select
+                [ value stringValue
+                , onInput (Json.Value.StringValue >> ChangeSectionInput key)
+                , class "w-full mb-3 px-2 py-1 control rounded"
+                ]
+                (List.map optionHtmlFor defaultValues)
+            ]
+
+        else
             let
-                ( baseTitle, kind ) =
-                    case String.split ":" sectionTitle of
-                        head :: second :: rest ->
-                            ( head, String.trim second )
-
-                        head :: [] ->
-                            ( head, "text" )
-
-                        [] ->
-                            ( "", "" )
-
-                isSingular =
-                    kind == "text"
-
-                key =
-                    baseTitle
-                        :: parentPath
-                        |> List.reverse
-                        |> String.join "."
-
-                jsonToStrings json =
-                    case json of
-                        StringValue s ->
-                            [ s ]
-
-                        NumericValue n ->
-                            [ toString n ]
-
-                        BoolValue b ->
-                            if b then
-                                [ "✅" ]
-                            else
-                                [ "❎" ]
-
-                        ArrayValue items ->
-                            items
-                                |> List.concatMap jsonToStrings
+                rowCount =
+                    case kind of
+                        "number" ->
+                            1
 
                         _ ->
-                            []
-
-                defaultValues : List String
-                defaultValues =
-                    contentResults
-                        |> List.filterMap (Result.toMaybe)
-                        |> List.filterMap (options.contentToJson >> Result.toMaybe)
-                        |> List.concatMap jsonToStrings
-
-                choiceCount =
-                    List.length defaultValues
-
-                stringValue =
-                    case Dict.get key options.sectionInputs of
-                        Nothing ->
-                            if choiceCount > 1 then
-                                defaultValues |> List.head |> Maybe.withDefault ""
-                            else
-                                ""
-
-                        Just (StringValue s) ->
-                            s
-
-                        Just json ->
-                            if isSingular then
-                                jsonToStrings json |> List.head |> Maybe.withDefault ""
-                            else
-                                jsonToStrings json |> String.join "\n"
-
-                hasSubsections =
-                    not <| List.isEmpty subsections
-
-                optionHtmlFor string =
-                    option [ value string ] [ text string ]
+                            3
             in
-                if hasSubsections then
-                    []
-                else if kind == "bool" then
-                    [ label
-                        [ class "block" ]
-                        [ input
-                            [ type_ "checkbox"
-                            , onCheck (JsonValue.BoolValue >> ChangeSectionInput key)
-                            ]
-                            []
-                        , text " "
-                        , text baseTitle
-                        ]
-                    ]
-                else if choiceCount > 1 then
-                    [ select
-                        [ value stringValue
-                        , onInput (JsonValue.StringValue >> ChangeSectionInput key)
-                        , class "w-full mb-3 px-2 py-1 control rounded"
-                        ]
-                        (List.map optionHtmlFor defaultValues)
-                    ]
-                else
-                    let
-                        rowCount =
-                            case kind of
-                                "number" ->
-                                    1
+            [ textarea
+                [ value stringValue
+                , placeholder (String.join "\n" defaultValues)
+                , onInput (Json.Value.StringValue >> ChangeSectionInput key)
+                , rows rowCount
+                , class "w-full mb-3 px-2 py-1 control rounded-sm"
+                ]
+                []
+            ]
 
-                                _ ->
-                                    3
-                    in
-                        [ textarea
-                            [ value stringValue
-                            , placeholder (String.join "\n" defaultValues)
-                            , onInput (JsonValue.StringValue >> ChangeSectionInput key)
-                            , rows rowCount
-                            , class "w-full mb-3 px-2 py-1 control rounded-sm"
-                            ]
-                            []
-                        ]
-        else
-            contentResults
-                |> List.map (viewContentResult options)
+    else
+        contentResults
+            |> List.map (viewContentResult options)
 
 
 type alias SectionViewModel e =
@@ -1125,6 +1168,7 @@ viewNavListItem title active clickMsg =
             [ class "w-full px-4 py-2 text-left text-base font-bold cursor-default"
             , if active then
                 class "text-indigo-darkest bg-blue-light"
+
               else
                 class "text-white bg-indigo-darkest"
             , onClick clickMsg
@@ -1142,7 +1186,7 @@ viewListInner collection model activeKey =
         innerHtmls =
             case Dict.get (Routes.collectionSourceToId collection) model.sourceStatuses of
                 Just Loaded ->
-                    (Dict.map viewItem model.documentSources |> Dict.values)
+                    Dict.map viewItem model.documentSources |> Dict.values
 
                 Just Loading ->
                     let
@@ -1154,15 +1198,15 @@ viewListInner collection model activeKey =
                                 Tour ->
                                     "Loading Tours…"
                     in
-                        [ h2 [ class "mt-3" ]
-                            [ text message ]
-                        ]
+                    [ h2 [ class "mt-3" ]
+                        [ text message ]
+                    ]
 
                 _ ->
                     []
     in
-        div [ class "bg-indigo-darkest" ]
-            innerHtmls
+    div [ class "bg-indigo-darkest" ]
+        innerHtmls
 
 
 viewCollectionConfigLinks : Route -> CollectionSource -> Html Message
@@ -1171,9 +1215,9 @@ viewCollectionConfigLinks route collection =
         contentSourcesActive =
             route == CollectionContentSources collection
     in
-        div [ class "pt-4 bg-indigo-darkest" ]
-            [ viewNavListItem "Import content" contentSourcesActive (GoToContentSources collection)
-            ]
+    div [ class "pt-4 bg-indigo-darkest" ]
+        [ viewNavListItem "Import content" contentSourcesActive (GoToContentSources collection)
+        ]
 
 
 viewCollectionSummary : CollectionSource -> Html Message
@@ -1189,9 +1233,9 @@ viewCollectionSummary collection =
                 Tour ->
                     text "Tour"
     in
-        div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
-            [ h2 [ class "text-sm text-white" ] [ message ]
-            ]
+    div [ class "pt-3 pb-4 px-4 bg-indigo-darkest" ]
+        [ h2 [ class "text-sm text-white" ] [ message ]
+        ]
 
 
 processDocumentWithModel : Model -> Document (Result Error (List (List Token))) -> Resolved Evaluate.Error (Result Error (List (List Token)))
@@ -1222,6 +1266,7 @@ viewQueryField field =
                         [ text
                             (if b then
                                 "true"
+
                              else
                                 "false"
                             )
@@ -1230,8 +1275,8 @@ viewQueryField field =
                 QueryModel.IntValue i ->
                     div
                         [ class "italic" ]
-                        [ text (toString i) ]
-                
+                        [ text (String.fromInt i) ]
+
                 QueryModel.StringsArrayValue strings ->
                     ol
                         [ class "ml-4" ]
@@ -1251,20 +1296,25 @@ viewMutationField field =
                 QueryModel.ArgsDefinition args ->
                     List.length args
     in
-        button
-            [ class "px-2 py-1 mb-1 text-white bg-green rounded-sm border border-green-dark"
-            , onClick (RunMutation field.name)
-            ]
-            [ text (field.name)
-            , text <| if argCount > 0 then "…" else ""
-            ]
+    button
+        [ class "px-2 py-1 mb-1 text-white bg-green rounded-sm border border-green-dark"
+        , onClick (RunMutation field.name)
+        ]
+        [ text field.name
+        , text <|
+            if argCount > 0 then
+                "…"
+
+            else
+                ""
+        ]
 
 
 viewMutationHistory : List String -> Html Message
 viewMutationHistory mutationNames =
     details [ class "mb-8", open True ]
         [ summary [ class "font-bold text-green" ]
-            [ text ("Mutation history (" ++ (List.length mutationNames |> toString) ++ ")")
+            [ text ("Mutation history (" ++ (List.length mutationNames |> Debug.toString) ++ ")")
             ]
         , ol [ class "ml-4" ]
             (mutationNames
@@ -1288,7 +1338,7 @@ viewDocumentPreview model resolved =
             , hideNoContent = False
             , processDocument = processDocumentWithModel model
             , sectionInputs = model.sectionInputs
-            , getRpcResponse = (flip Dict.get) model.rpcResponses
+            , getRpcResponse = (\b a -> Dict.get a b) model.rpcResponses
             , contentToJson = contentToJson model
             , baseHtmlSource =
                 Dict.get "components/base.html" model.documentSources
@@ -1349,15 +1399,15 @@ viewDocumentPreview model resolved =
                                 |> List.head
                                 |> Maybe.map Tuple.second
 
-                        applyMutation name queryModel =
+                        applyMutation name targetQueryModel =
                             case mutationSectionWithName name of
                                 Just mutationSection ->
-                                    applyValuesToModel mutationSection queryModel
+                                    applyValuesToModel mutationSection targetQueryModel
 
                                 Nothing ->
-                                    queryModel
+                                    targetQueryModel
                     in
-                        Just <| List.foldr applyMutation queryModel model.mutationHistory
+                    Just <| List.foldr applyMutation queryModel model.mutationHistory
 
                 _ ->
                     maybeQueryModel
@@ -1378,33 +1428,33 @@ viewDocumentPreview model resolved =
                 resolved.intro
                 []
     in
-        div [ class "w-1/2 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
-            [ div [ row, class "mb-4" ]
-                [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text resolved.title ]
-                ]
-            , div [ class "pr-4" ] introHtml
-            , case maybeQueryModelWithMutations of
-                Just queryModel ->
-                    div [ col, class "mb-4 mr-4" ]
-                        (List.map viewQueryField queryModel.fields)
-
-                Nothing ->
-                    text ""
-            , case maybeMutationModel of
-                Just mutationModel ->
-                    div [ col, class "mb-4 mr-4" ]
-                        (List.map viewMutationField mutationModel.fields)
-
-                Nothing ->
-                    text ""
-            , case maybeMutationModel of
-                Just mutationModel ->
-                    viewMutationHistory model.mutationHistory
-
-                Nothing ->
-                    text ""
-            , div [ class "pr-4" ] sectionsHtml
+    div [ class "w-1/2 overflow-auto mb-8 pl-4 pb-8 md:pl-6 leading-tight" ]
+        [ div [ row, class "mb-4" ]
+            [ h1 [ class "flex-1 pt-4 text-3xl text-blue" ] [ text resolved.title ]
             ]
+        , div [ class "pr-4" ] introHtml
+        , case maybeQueryModelWithMutations of
+            Just queryModel ->
+                div [ col, class "mb-4 mr-4" ]
+                    (List.map viewQueryField queryModel.fields)
+
+            Nothing ->
+                text ""
+        , case maybeMutationModel of
+            Just mutationModel ->
+                div [ col, class "mb-4 mr-4" ]
+                    (List.map viewMutationField mutationModel.fields)
+
+            Nothing ->
+                text ""
+        , case maybeMutationModel of
+            Just mutationModel ->
+                viewMutationHistory model.mutationHistory
+
+            Nothing ->
+                text ""
+        , div [ class "pr-4" ] sectionsHtml
+        ]
 
 
 viewDocumentSource : Model -> String -> Resolved Evaluate.Error Expressions -> Html Message
@@ -1428,16 +1478,23 @@ viewDocumentSource model documentSource resolvedDocument =
                 _ ->
                     viewDocumentPreview model resolvedDocument
     in
-        div [ col, class "flex-1 h-screen" ]
-            [ div [ row, class "flex-1 flex-wrap h-screen" ]
-                [ editorHtml
-                , previewHtml
-                ]
+    div [ col, class "flex-1 h-screen" ]
+        [ div [ row, class "flex-1 flex-wrap h-screen" ]
+            [ editorHtml
+            , previewHtml
             ]
+        ]
 
 
-view : Model -> Html Message
+view : Model -> Browser.Document Message
 view model =
+    { title = "Datadown"
+    , body = [ viewBody model ]
+    }
+
+
+viewBody : Model -> Html Message
+viewBody model =
     div [ class "flex justify-center flex-1" ]
         [ case model.route of
             Collection collection ->
@@ -1454,10 +1511,10 @@ view model =
                                 ]
                             ]
                 in
-                    div [ row, class "flex-1" ]
-                        [ listView
-                        , documentView
-                        ]
+                div [ row, class "flex-1" ]
+                    [ listView
+                    , documentView
+                    ]
 
             CollectionContentSources collection ->
                 let
@@ -1495,10 +1552,10 @@ view model =
                                 ]
                             ]
                 in
-                    div [ row, class "flex-1" ]
-                        [ listView
-                        , documentView
-                        ]
+                div [ row, class "flex-1" ]
+                    [ listView
+                    , documentView
+                    ]
 
             CollectionItem collection key _ ->
                 let
@@ -1518,10 +1575,10 @@ view model =
                                 ]
                             ]
                 in
-                    div [ row, class "flex-1" ]
-                        [ listView
-                        , documentView
-                        ]
+                div [ row, class "flex-1" ]
+                    [ listView
+                    , documentView
+                    ]
 
             _ ->
                 div [ col, class "flex flex-row flex-1 max-w-sm p-4 text-center text-grey-darkest" ]
@@ -1543,10 +1600,11 @@ view model =
 
 main : Program Flags Model Message
 main =
-    Navigation.programWithFlags
-        NavigateTo
+    Browser.application
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
+        , onUrlRequest = NavigateTo
+        , onUrlChange = UrlChanged
         }

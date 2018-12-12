@@ -1,13 +1,12 @@
-module Services.GitHub
-    exposing
-        ( ContentInfo
-        , listDocuments
-        )
+module Services.GitHub exposing
+    ( ContentInfo
+    , listDocuments
+    )
 
-import Json.Decode exposing (..)
-import Http
-import Task exposing (Task)
 import Base64
+import Http
+import Json.Decode exposing (..)
+import Task exposing (Task)
 import UrlBase64
 
 
@@ -68,9 +67,9 @@ contentFieldsDecoder =
                 _ ->
                     Nothing
     in
-        map2 fromFields
-            (field "content" string)
-            (field "encoding" string)
+    map2 fromFields
+        (field "content" string)
+        (field "encoding" string)
 
 
 contentInfoDecoder : Decoder ContentInfo
@@ -90,8 +89,8 @@ searchCode params =
                 |> List.map Http.encodeUri
                 |> String.join " "
     in
-        Http.get ("https://api.github.com/search/code?q=" ++ q) <|
-            searchResultsDecoder
+    Http.get ("https://api.github.com/search/code?q=" ++ q) <|
+        searchResultsDecoder
 
 
 loadContent : String -> Task Http.Error ContentInfo
@@ -108,11 +107,11 @@ listDocuments owner repo =
                 |> List.map (.url >> loadContent)
                 |> Task.sequence
     in
-        searchCode
-            [ "components"
-            , "in:path"
-            , "language:md"
-            , "repo:" ++ owner ++ "/" ++ repo
-            ]
-            |> Http.toTask
-            |> Task.andThen resultsToDownloadTasks
+    searchCode
+        [ "components"
+        , "in:path"
+        , "language:md"
+        , "repo:" ++ owner ++ "/" ++ repo
+        ]
+        |> Http.toTask
+        |> Task.andThen resultsToDownloadTasks

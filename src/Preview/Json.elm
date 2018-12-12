@@ -1,8 +1,7 @@
-module Preview.Json
-    exposing
-        ( view
-        , viewJson
-        )
+module Preview.Json exposing
+    ( view
+    , viewJson
+    )
 
 {-| Preview JSON
 
@@ -14,9 +13,9 @@ module Preview.Json
 -}
 
 import Html exposing (..)
-import Html.Attributes exposing (class, attribute)
+import Html.Attributes exposing (attribute, class)
 import Json.Decode
-import JsonValue exposing (JsonValue(..))
+import Json.Value exposing (JsonValue(..))
 
 
 viewSymbol : String -> Html msg
@@ -39,7 +38,7 @@ viewArrayItem value =
 
 viewKeyValuePair : ( String, JsonValue ) -> List (Html msg)
 viewKeyValuePair ( key, value ) =
-    [ dt [ class "text-purple-darker" ] ((viewString key) ++ [ viewSymbol ":" ])
+    [ dt [ class "text-purple-darker" ] (viewString key ++ [ viewSymbol ":" ])
     , dd [ class "mb-1 ml-2 pl-1 bg-purple-o-10" ] [ viewValue value ]
     ]
 
@@ -50,15 +49,16 @@ viewValue json =
         children =
             case json of
                 StringValue string ->
-                    (viewString string)
+                    viewString string
 
                 NumericValue number ->
-                    [ text (toString number) ]
+                    [ text (String.fromFloat number) ]
 
                 BoolValue bool ->
                     [ text
                         (if bool then
                             "true"
+
                          else
                             "false"
                         )
@@ -85,7 +85,7 @@ viewValue json =
                 NullValue ->
                     [ text "null" ]
     in
-        div [ class "text-base text-black" ] children
+    div [ class "text-base text-black" ] children
 
 
 {-| Previews a JSON value as HTML
@@ -103,12 +103,12 @@ view source =
     let
         result =
             source
-                |> Json.Decode.decodeString JsonValue.decoder
+                |> Json.Decode.decodeString Json.Value.decoder
     in
-        case result of
-            Ok jsonValue ->
-                div [ class "pt-2 pb-2 pl-2 bg-purple-o-10" ]
-                    [ viewValue jsonValue ]
+    case result of
+        Ok jsonValue ->
+            div [ class "pt-2 pb-2 pl-2 bg-purple-o-10" ]
+                [ viewValue jsonValue ]
 
-            Err error ->
-                div [] [ text error ]
+        Err error ->
+            div [] [ text <| Json.Decode.errorToString error ]

@@ -9,7 +9,7 @@ import Test exposing (..)
 import Datadown.Expressions exposing (Operator(..), Token(..), IntExpression(..), BoolExpression(..), Expression(..), ParseError(..), EvaluateError(..), tokenize, parseExpression, evaluateAsInt, evaluateAsJson)
 import Datadown.Url exposing (Url(..), MathFunction(..))
 import Datadown.Procedures exposing (Procedure(..))
-import JsonValue exposing (..)
+import Json.Value exposing (..)
 import Dict
 
 

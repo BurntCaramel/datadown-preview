@@ -1,12 +1,8 @@
-module Datadown.Process
-    exposing
-        ( processDocumentWith
-        , processDocument
-        , processComponent
-        , Error(..)
-        , Resolved
-        , ResolvedSection(..)
-        )
+module Datadown.Process exposing
+    ( Error(..)
+    , processDocument
+    , Resolved, ResolvedSection(..), processComponent, processDocumentWith
+    )
 
 {-| Process
 
@@ -22,12 +18,12 @@ module Datadown.Process
 
 -}
 
-import Dict exposing (Dict(..))
-import Regex exposing (Regex)
-import Datadown exposing (Document, Section(..), Content(..), ListItemQualifier)
+import Datadown exposing (Content(..), Document, ListItemQualifier, Section(..))
 import Datadown.Rpc as Rpc exposing (Rpc)
-import JsonValue exposing (JsonValue)
+import Dict exposing (Dict(..))
 import Json.Decode
+import Json.Value exposing (JsonValue)
+import Regex exposing (Regex)
 
 
 {-| Error after processing, possibly from evaluating expressions
@@ -41,7 +37,7 @@ type Error e
     | Evaluate e
     | EvaluatingExpression String e
     | UnknownExpression
-    | DecodingJson String
+    | DecodingJson Json.Decode.Error
     | Multiple (List (Error e))
 
 
@@ -70,70 +66,77 @@ type alias CustomElement =
 
 mustacheVariableRegex : Regex
 mustacheVariableRegex =
-    Regex.regex "{{([^}]*)}}"
+    Regex.fromString "{{([^}]*)}}"
+        |> Maybe.withDefault Regex.never
 
 
 mustacheSectionRegex : Regex
 mustacheSectionRegex =
-    Regex.regex "{{#\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+    Regex.fromString "{{#\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+        |> Maybe.withDefault Regex.never
 
 
 mustacheSectionNegativeRegex : Regex
 mustacheSectionNegativeRegex =
-    Regex.regex "{{^\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+    Regex.fromString "{{^\\s*([^}]+?)\\s*}}([\\S\\s]+?){{/\\s*\\1\\s*}}"
+        |> Maybe.withDefault Regex.never
 
 
 customElementOpenRegex : Regex
 customElementOpenRegex =
-    Regex.regex "<([A-Z]\\w*)([^>]*)>([\\S\\s]+)"
+    Regex.fromString "<([A-Z]\\w*)([^>]*)>([\\S\\s]+)"
+        |> Maybe.withDefault Regex.never
 
 
 attributeRegex : Regex
 attributeRegex =
-    Regex.regex "\\s*(\\w[^=\"\\s]+)(?:=\"(\\w*)\")?"
+    Regex.fromString "\\s*(\\w[^=\"\\s]+)(?:=\"(\\w*)\")?"
+        |> Maybe.withDefault Regex.never
 
 
 customElementCloseRegex : String -> Regex
 customElementCloseRegex name =
     "</"
-        ++ (Regex.escape name)
+        ++ name
         ++ ">"
-        |> Regex.regex
+        |> Regex.fromString
+        |> Maybe.withDefault Regex.never
 
 
 jsonToString : JsonValue -> String
 jsonToString json =
     case json of
-        JsonValue.StringValue s ->
+        Json.Value.StringValue s ->
             s
 
-        JsonValue.NumericValue f ->
-            toString f
+        Json.Value.NumericValue f ->
+            String.fromFloat f
 
         -- TODO: turn to real Markdown?
-        JsonValue.ArrayValue items ->
+        Json.Value.ArrayValue items ->
             items
                 |> List.map jsonToString
                 |> String.join "\n"
 
-        JsonValue.BoolValue bool ->
+        Json.Value.BoolValue bool ->
             if bool then
                 "👍"
+
             else
                 "👎"
 
         _ ->
-            toString json
+            Debug.toString json
 
 
 matchToAttribute : Regex.Match -> Maybe ( String, JsonValue )
 matchToAttribute match =
     case match.submatches of
         (Just key) :: (Just value) :: [] ->
-            Just ( key, JsonValue.StringValue value )
+            Just ( key, Json.Value.StringValue value )
 
         (Just key) :: Nothing :: [] ->
-            Just ( key, JsonValue.BoolValue True )
+            Just ( key, Json.Value.BoolValue True )
 
         _ ->
             Nothing
@@ -151,7 +154,7 @@ processCustomElements evaluateComponent input =
                             case maybeAttributesSource of
                                 Just source ->
                                     source
-                                        |> Regex.find Regex.All attributeRegex
+                                        |> Regex.find attributeRegex
                                         |> List.filterMap matchToAttribute
 
                                 Nothing ->
@@ -160,20 +163,20 @@ processCustomElements evaluateComponent input =
                         ( customElement, rest ) =
                             case maybeContent of
                                 Just content ->
-                                    case Regex.split (Regex.AtMost 1) (customElementCloseRegex componentName) content of
+                                    case Regex.splitAtMost 1 (customElementCloseRegex componentName) content of
                                         childrenSource :: restInput :: [] ->
                                             let
                                                 children =
                                                     processCustomElements evaluateComponent childrenSource
 
                                                 el =
-                                                    CustomElement Nothing componentName (props ++ [ ( "children", JsonValue.StringValue children ) ])
+                                                    CustomElement Nothing componentName (props ++ [ ( "children", Json.Value.StringValue children ) ])
 
-                                                rest =
+                                                newRest =
                                                     restInput
                                                         |> processCustomElements evaluateComponent
                                             in
-                                                ( el, rest )
+                                                ( el, newRest )
 
                                         childrenSource :: [] ->
                                             let
@@ -181,9 +184,9 @@ processCustomElements evaluateComponent input =
                                                     processCustomElements evaluateComponent childrenSource
 
                                                 el =
-                                                    CustomElement Nothing componentName (props ++ [ ( "children", JsonValue.StringValue children ) ])
+                                                    CustomElement Nothing componentName (props ++ [ ( "children", Json.Value.StringValue children ) ])
                                             in
-                                                ( el, "" )
+                                            ( el, "" )
 
                                         _ ->
                                             ( CustomElement Nothing componentName props, "" )
@@ -194,20 +197,20 @@ processCustomElements evaluateComponent input =
                         result =
                             evaluateComponent customElement
                     in
-                        case result of
-                            Ok (Code maybeLanguage source) ->
-                                source ++ rest
+                    case result of
+                        Ok (Code maybeLanguage source) ->
+                            source ++ rest
 
-                            Ok _ ->
-                                rest
+                        Ok _ ->
+                            rest
 
-                            Err error ->
-                                (toString error)
+                        Err error ->
+                            Debug.toString error
 
                 _ ->
                     "?"
     in
-        Regex.replace (Regex.AtMost 1) customElementOpenRegex replacer input
+    Regex.replaceAtMost 1 customElementOpenRegex replacer input
 
 
 mustache : (CustomElement -> Result (Error e) (Content a)) -> (Maybe JsonValue -> String -> Maybe JsonValue) -> Maybe JsonValue -> String -> String
@@ -216,8 +219,8 @@ mustache evaluateComponent resolveVariable =
         sectionReplacer : Maybe JsonValue -> (Bool -> Bool) -> Regex.Match -> String
         sectionReplacer context transformBool match =
             let
-                value : Maybe JsonValue
-                value =
+                maybeValue : Maybe JsonValue
+                maybeValue =
                     match.submatches
                         |> List.head
                         |> Maybe.withDefault Nothing
@@ -234,36 +237,36 @@ mustache evaluateComponent resolveVariable =
 
                 passes json =
                     case json of
-                        JsonValue.BoolValue False ->
+                        Json.Value.BoolValue False ->
                             False
 
-                        JsonValue.NullValue ->
+                        Json.Value.NullValue ->
                             False
 
                         _ ->
                             True
 
                 values =
-                    case value of
+                    case maybeValue of
                         Nothing ->
                             []
 
-                        Just (JsonValue.ArrayValue items) ->
+                        Just (Json.Value.ArrayValue items) ->
                             items
                                 |> List.filter passes
 
-                        Just (JsonValue.BoolValue False) ->
+                        Just (Json.Value.BoolValue False) ->
                             []
 
-                        Just JsonValue.NullValue ->
+                        Just Json.Value.NullValue ->
                             []
 
                         Just value ->
                             [ value ]
             in
-                values
-                    |> List.map (\value -> process (Just value) inner)
-                    |> String.join "\n"
+            values
+                |> List.map (\value -> process (Just value) inner)
+                |> String.join "\n"
 
         variableReplacer : Maybe JsonValue -> Regex.Match -> String
         variableReplacer context match =
@@ -278,12 +281,12 @@ mustache evaluateComponent resolveVariable =
         process context input =
             input
                 |> processCustomElements evaluateComponent
-                |> Regex.replace Regex.All mustacheSectionRegex (sectionReplacer context identity)
-                |> Regex.replace Regex.All mustacheSectionNegativeRegex (sectionReplacer context not)
-                |> Regex.replace Regex.All mustacheVariableRegex (variableReplacer context)
+                |> Regex.replace mustacheSectionRegex (sectionReplacer context identity)
+                |> Regex.replace mustacheSectionNegativeRegex (sectionReplacer context not)
+                |> Regex.replace mustacheVariableRegex (variableReplacer context)
                 |> String.trim
     in
-        process
+    process
 
 
 contentForKeyPathInResolvedSections : List ( String, ResolvedSection (Error e) a ) -> List String -> Maybe (List (Result (Error e) (Content a)))
@@ -315,7 +318,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                             case contentResult of
                                 Ok (Json json) ->
                                     json
-                                        |> JsonValue.getIn otherKeys
+                                        |> Json.Value.getIn otherKeys
                                         |> Result.mapError (always (NoValueForKeyPath keyPath))
                                         |> Result.map Json
                                         |> List.singleton
@@ -327,6 +330,7 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                 _ ->
                                     if otherKeys == [] then
                                         [ contentResult ]
+
                                     else
                                         [ Err (NoValueForKeyPath keyPath) ]
 
@@ -346,24 +350,25 @@ contentForKeyPathInResolvedSections resolvedSections keyPath =
                                         _ ->
                                             Nothing
                             in
-                                case maybeBaseKey of
-                                    Just baseKey ->
-                                        if baseKey == firstKey then
-                                            case record.mainContent of
-                                                [] ->
-                                                    otherKeys
-                                                        |> contentForKeyPathInResolvedSections record.subsections
+                            case maybeBaseKey of
+                                Just baseKey ->
+                                    if baseKey == firstKey then
+                                        case record.mainContent of
+                                            [] ->
+                                                otherKeys
+                                                    |> contentForKeyPathInResolvedSections record.subsections
 
-                                                _ ->
-                                                    Just (List.concatMap resolveContentResult record.mainContent)
-                                        else
-                                            Nothing
+                                            _ ->
+                                                Just (List.concatMap resolveContentResult record.mainContent)
 
-                                    Nothing ->
+                                    else
                                         Nothing
 
-                findInSections resolvedSections =
-                    case resolvedSections of
+                                Nothing ->
+                                    Nothing
+
+                findInSections innerResolvedSections =
+                    case innerResolvedSections of
                         [] ->
                             Nothing
 
@@ -397,7 +402,7 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
         valueForIdentifier : Maybe JsonValue -> String -> Result (Error e) JsonValue
         valueForIdentifier context id =
             valueListForIdentifier context id
-                |> Result.map (JsonValue.ArrayValue)
+                |> Result.map Json.Value.ArrayValue
 
         resolveExpressionString : Maybe JsonValue -> String -> Maybe JsonValue
         resolveExpressionString context s =
@@ -434,13 +439,14 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                                     in
                                         if skip then
                                             Ok ( items, rpcs )
-                                        else
-                                            case processContent item of
-                                                Ok ( processedItem, newRpcs ) ->
-                                                    Ok ( ( processedItem, Datadown.Always ) :: items, newRpcs ++ rpcs )
 
-                                                Err error ->
-                                                    Err error
+                                    else
+                                        case processContent item of
+                                            Ok ( processedItem, processedRpcs ) ->
+                                                Ok ( ( processedItem, Datadown.Always ) :: items, processedRpcs ++ rpcs )
+
+                                            Err error ->
+                                                Err error
 
                                 Err error ->
                                     Err error
@@ -461,17 +467,17 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                         rpc =
                             Rpc.graphQL graphqlSource
                     in
-                        Ok ( content, [ rpc ] )
+                    Ok ( content, [ rpc ] )
 
                 Code (Just "json") jsonSource ->
                     let
                         jsonResult =
                             jsonSource
-                                |> Json.Decode.decodeString JsonValue.decoder
+                                |> Json.Decode.decodeString Json.Value.decoder
                     in
-                        jsonResult
-                            |> Result.map (Json >> noRpcs)
-                            |> Result.mapError DecodingJson
+                    jsonResult
+                        |> Result.map (Json >> noRpcs)
+                        |> Result.mapError DecodingJson
 
                 Code language codeText ->
                     Ok ( Code language (mustache evaluateComponent resolveExpressionString Nothing codeText), [] )
@@ -489,29 +495,29 @@ processSection valueListForIdentifier evaluateComponent evaluateExpression secti
                         Err error ->
                             Err (Evaluate error)
 
-                content ->
-                    Ok ( content, [] )
+                otherContent ->
+                    Ok ( otherContent, [] )
 
         processNextContent : Content a -> ( List (Result (Error e) (Content a)), List (Rpc String) ) -> ( List (Result (Error e) (Content a)), List (Rpc String) )
         processNextContent content ( results, rpcs ) =
             case processContent content of
-                Ok ( newResult, newRpcs ) ->
-                    ( Ok newResult :: results, newRpcs ++ rpcs )
+                Ok ( newResult, processedRpcs ) ->
+                    ( Ok newResult :: results, processedRpcs ++ rpcs )
 
                 Err error ->
                     ( Err error :: results, [] )
 
-        ( mainContent, rpcs ) =
+        ( mainContent, newRpcs ) =
             sectionRecord.mainContent
                 |> List.foldl processNextContent ( [], [] )
                 |> Tuple.mapFirst List.reverse
                 |> Tuple.mapSecond List.reverse
     in
-        ResolvedSection
-            { mainContent = mainContent
-            , subsections = resolvedSubsections
-            , rpcs = rpcs
-            }
+    ResolvedSection
+        { mainContent = mainContent
+        , subsections = resolvedSubsections
+        , rpcs = newRpcs
+        }
 
 
 flattenResults : List (Result e a) -> Result e (List a)
@@ -536,7 +542,7 @@ nextProcessedSection : (CustomElement -> Result (Error e) (Content a)) -> ((Stri
 nextProcessedSection evaluateComponent evaluateExpression contentToJson section prevResults =
     let
         contentForKey : Maybe JsonValue -> String -> Result (Error e) (List (Content a))
-        contentForKey context key =
+        contentForKey maybeContext key =
             let
                 keyPath =
                     key
@@ -550,23 +556,23 @@ nextProcessedSection evaluateComponent evaluateExpression contentToJson section 
                         path ->
                             path
             in
-                case keyPath of
-                    "" :: otherKeys ->
-                        case context of
-                            Just context ->
-                                context
-                                    |> JsonValue.getIn (conformPath otherKeys)
-                                    |> Result.mapError (always (NoValueForKeyPath keyPath))
-                                    |> Result.map (Json >> List.singleton)
+            case keyPath of
+                "" :: otherKeys ->
+                    case maybeContext of
+                        Just context ->
+                            context
+                                |> Json.Value.getIn (conformPath otherKeys)
+                                |> Result.mapError (always (NoValueForKeyPath keyPath))
+                                |> Result.map (Json >> List.singleton)
 
-                            Nothing ->
-                                Err (NoValueForKeyPath keyPath)
+                        Nothing ->
+                            Err (NoValueForKeyPath keyPath)
 
-                    _ ->
-                        keyPath
-                            |> contentForKeyPathInResolvedSections prevResults
-                            |> Maybe.map flattenResults
-                            |> Maybe.withDefault (Err (NoValueForKeyPath keyPath))
+                _ ->
+                    keyPath
+                        |> contentForKeyPathInResolvedSections prevResults
+                        |> Maybe.map flattenResults
+                        |> Maybe.withDefault (Err (NoValueForKeyPath keyPath))
 
         valueListForIdentifier : Maybe JsonValue -> String -> Result (Error e) (List JsonValue)
         valueListForIdentifier context key =
@@ -583,7 +589,7 @@ nextProcessedSection evaluateComponent evaluateExpression contentToJson section 
                 |> List.foldl (foldProcessedSections evaluateComponent evaluateExpression contentToJson) prevResults
                 |> List.take (List.length subsections)
     in
-        processSection valueListForIdentifier evaluateComponent evaluateExpression section resolvedSubsections
+    processSection valueListForIdentifier evaluateComponent evaluateExpression section resolvedSubsections
 
 
 foldProcessedSections : (CustomElement -> Result (Error e) (Content a)) -> ((String -> Result (Error e) JsonValue) -> a -> Result e JsonValue) -> (Content a -> Result e JsonValue) -> Section a -> List ( String, ResolvedSection (Error e) a ) -> List ( String, ResolvedSection (Error e) a )
@@ -598,7 +604,7 @@ foldProcessedSections evaluateComponent evaluateExpression contentToJson section
         resolvedSection =
             nextProcessedSection evaluateComponent evaluateExpression contentToJson sectionWrapper prevResults
     in
-        ( title, resolvedSection ) :: prevResults
+    ( title, resolvedSection ) :: prevResults
 
 
 {-| Process a document with the inputted content and return a result
@@ -623,15 +629,15 @@ processDocumentWith evaluateComponent evaluateExpression contentToJson document 
                         , urls = []
                         }
             in
-                case nextProcessedSection evaluateComponent evaluateExpression contentToJson introSection resolvedSections of
-                    ResolvedSection { mainContent } ->
-                        mainContent
+            case nextProcessedSection evaluateComponent evaluateExpression contentToJson introSection resolvedSections of
+                ResolvedSection { mainContent } ->
+                    mainContent
     in
-        { title = document.title
-        , sections = resolvedSections
-        , intro = resolvedIntro
-        , tests = []
-        }
+    { title = document.title
+    , sections = resolvedSections
+    , intro = resolvedIntro
+    , tests = []
+    }
 
 
 defaultEvaluateComponent : CustomElement -> Result (Error e) (Content a)
@@ -643,7 +649,7 @@ defaultEvaluateComponent element =
 
         getBoolProp name =
             case Dict.get name propsDict of
-                Just (JsonValue.BoolValue bool) ->
+                Just (Json.Value.BoolValue bool) ->
                     bool
 
                 _ ->
@@ -651,53 +657,54 @@ defaultEvaluateComponent element =
 
         getStringProp name =
             case Dict.get name propsDict of
-                Just (JsonValue.StringValue string) ->
+                Just (Json.Value.StringValue string) ->
                     string
 
                 _ ->
                     ""
     in
-        case element.componentName of
-            "Row" ->
-                let
-                    content =
-                        getStringProp "children"
-                in
-                    Ok <| Code (Just "html") <| "<div class=\"flex flex-row\">" ++ content ++ "</div>"
+    case element.componentName of
+        "Row" ->
+            let
+                content =
+                    getStringProp "children"
+            in
+            Ok <| Code (Just "html") <| "<div class=\"flex flex-row\">" ++ content ++ "</div>"
 
-            "Col" ->
-                let
-                    content =
-                        getStringProp "children"
-                in
-                    Ok <| Code (Just "html") <| "<div class=\"flex flex-col flex-grow\">" ++ content ++ "</div>"
+        "Col" ->
+            let
+                content =
+                    getStringProp "children"
+            in
+            Ok <| Code (Just "html") <| "<div class=\"flex flex-col flex-grow\">" ++ content ++ "</div>"
 
-            "Button" ->
-                let
-                    primary =
-                        getBoolProp "primary"
+        "Button" ->
+            let
+                primary =
+                    getBoolProp "primary"
 
-                    content =
-                        getStringProp "children"
+                content =
+                    getStringProp "children"
 
-                    class : String
-                    class =
-                        [ "px-2 py-2 rounded"
-                        , if primary then
-                            "bg-blue-light"
-                          else
-                            "bg-grey-light"
-                        ]
-                            |> String.join " "
-                in
-                    Ok <| Code (Just "html") <| "<button class=\"" ++ class ++ "\">" ++ content ++ "</button>"
+                class : String
+                class =
+                    [ "px-2 py-2 rounded"
+                    , if primary then
+                        "bg-blue-light"
 
-            "orange-button" ->
-                Ok <| Code (Just "html") """<button class="bg-orange-light px-2 py-1 rounded">Click me</button>
+                      else
+                        "bg-grey-light"
+                    ]
+                        |> String.join " "
+            in
+            Ok <| Code (Just "html") <| "<button class=\"" ++ class ++ "\">" ++ content ++ "</button>"
+
+        "orange-button" ->
+            Ok <| Code (Just "html") """<button class="bg-orange-light px-2 py-1 rounded">Click me</button>
 """
 
-            _ ->
-                Err <| NoValueForIdentifier element.componentName
+        _ ->
+            Err <| NoValueForIdentifier element.componentName
 
 
 {-| Process a document and return a result
@@ -717,14 +724,14 @@ findSectionContent sectionTitle resolvedDocument =
             resolvedDocument.sections
                 |> List.filter hasTitle
                 |> List.head
-                |> Maybe.map (Tuple.second)
+                |> Maybe.map Tuple.second
     in
-        case maybeSection of
-            Just (ResolvedSection record) ->
-                Just record.mainContent
+    case maybeSection of
+        Just (ResolvedSection record) ->
+            Just record.mainContent
 
-            _ ->
-                Nothing
+        _ ->
+            Nothing
 
 
 {-| Process a document with inputted content and return a result

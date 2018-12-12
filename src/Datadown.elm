@@ -1,11 +1,7 @@
-module Datadown
-    exposing
-        ( Document
-        , Section(..)
-        , Content(..)
-        , ListItemQualifier(..)
-        , sectionHasTitle
-        )
+module Datadown exposing
+    ( Document, Section(..), Content(..)
+    , ListItemQualifier(..), sectionHasTitle
+    )
 
 {-| A library for Datadown parsing
 
@@ -17,7 +13,7 @@ module Datadown
 -}
 
 import Dict exposing (Dict)
-import JsonValue exposing (JsonValue)
+import Json.Value exposing (JsonValue)
 
 
 type ListItemQualifier a

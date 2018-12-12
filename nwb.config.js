@@ -17,7 +17,13 @@ module.exports = {
         rules: [{
           test:    /\.elm$/,
           exclude: [/elm-stuff/, /node_modules/],
-          loader:  'elm-webpack-loader?verbose=true&warn=true&pathToMake=./node_modules/.bin/elm-make',
+          use: {
+            loader: 'elm-webpack-loader',
+            options: {
+              verbose: true,
+              pathToElm: './node_modules/.bin/elm'
+            }
+          }
         }]
       }
     },

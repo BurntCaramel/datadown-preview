@@ -1,11 +1,10 @@
-module Datadown.Url
-    exposing
-        ( Url(..)
-        , MathFunction(..)
-        , TimeFunction(..)
-        , schemeAndStringToUrl
-        , urlToString
-        )
+module Datadown.Url exposing
+    ( MathFunction(..)
+    , TimeFunction(..)
+    , Url(..)
+    , schemeAndStringToUrl
+    , urlToString
+    )
 
 
 type MathFunction
@@ -54,7 +53,7 @@ schemeAndStringToUrl scheme string =
             case string of
                 "seconds" ->
                     SecondsSinceUnixEpoch |> Ok |> Time
-                
+
                 s ->
                     Err s |> Time
 
@@ -81,12 +80,12 @@ urlToString url =
 
                 Ok E ->
                     "math:e"
-                
+
                 Err s ->
                     "math:" ++ s
 
         Time either ->
-            case either of 
+            case either of
                 Ok SecondsSinceUnixEpoch ->
                     "time:seconds"
 

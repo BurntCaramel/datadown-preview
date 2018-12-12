@@ -1,18 +1,8 @@
-module Expressions.Tokenize
-    exposing
-        ( identifier
-        , operator
-        , token
-        , tokens
-        , lines
-        , tokenize
-        , Token(..)
-        , Operator(..)
-        , Url(..)
-        , MathFunction(..)
-        , HttpFunction(..)
-        , urlToString
-        )
+module Expressions.Tokenize exposing
+    ( Token(..), Operator(..)
+    , tokenize
+    , HttpFunction(..), MathFunction(..), Url(..), identifier, lines, operator, token, tokens, urlToString
+    )
 
 {-| Tokenize
 
@@ -28,11 +18,10 @@ module Expressions.Tokenize
 
 -}
 
-import Parser exposing (..)
-import Parser.LanguageKit exposing (variable)
 import Char
+import Json.Value exposing (JsonValue(..))
+import Parser exposing (..)
 import Set exposing (Set)
-import JsonValue exposing (JsonValue(..))
 
 
 type MathFunction
@@ -118,7 +107,11 @@ notIdentifiers =
 
 identifier : Parser Token
 identifier =
-    variable isIdentifierHeadChar isIdentifierTailChar notIdentifiers
+    variable
+        { start = isIdentifierHeadChar
+        , inner = isIdentifierTailChar
+        , reserved = notIdentifiers
+        }
         |> map Identifier
 
 
@@ -145,8 +138,8 @@ schemeAndStringToUrl scheme string =
 
 
 urlToString : Url -> String
-urlToString url =
-    case url of
+urlToString aURL =
+    case aURL of
         Https string ->
             "https:" ++ string
 
@@ -168,16 +161,23 @@ urlToString url =
 
 whitespaceChars : Set Char
 whitespaceChars =
-    [ ' ', '\n', '\x0D', '\t' ]
+    [ ' ', '\n', '\u{000D}', '\t' ]
         |> Set.fromList
+
+
+notWhitespace : Char -> Bool
+notWhitespace c =   
+    Set.member c whitespaceChars |> not
 
 
 url : Parser Token
 url =
-    delayedCommitMap schemeAndStringToUrl
-        (keep oneOrMore Char.isLower |. symbol ":")
-        (keep oneOrMore (\c -> Set.member c whitespaceChars |> not))
-        |> map Url
+    backtrackable <|
+    map Url <|
+    succeed schemeAndStringToUrl
+        |= (chompWhile Char.isLower |> getChompedString)
+        |. symbol ":"
+        |= (chompWhile notWhitespace |> getChompedString)
 
 
 operator : Parser Operator
@@ -211,11 +211,11 @@ operator =
 value : Parser JsonValue
 value =
     oneOf
-        [ succeed NumericValue
+        [ succeed (negate >> NumericValue)
+            |. symbol "-"
             |= float
-        , delayedCommit (symbol "-") <|
-            succeed (negate >> NumericValue)
-                |= float
+        , succeed NumericValue
+            |= float
         , succeed (BoolValue True)
             |. keyword "true"
         , succeed (BoolValue False)
@@ -236,17 +236,16 @@ magicNumbers =
 
 token : Parser Token
 token =
-    inContext "token" <|
-        oneOf
-            [ succeed Value
-                |= magicNumbers
-            , url
-            , identifier
-            , succeed Value
-                |= value
-            , succeed Operator
-                |= operator
-            ]
+    oneOf
+        [ succeed Value
+            |= magicNumbers
+        , url
+        , identifier
+        , succeed Value
+            |= value
+        , succeed Operator
+            |= operator
+        ]
 
 
 isSpace : Char -> Bool
@@ -259,32 +258,28 @@ isNewline c =
     c == '\n'
 
 
-spaces : Parser ()
-spaces =
-    ignore oneOrMore isSpace
-
-
 optionalSpaces : Parser ()
 optionalSpaces =
-    ignore zeroOrMore isSpace
+    chompWhile isSpace
 
 
 newlines : Parser ()
 newlines =
-    ignore oneOrMore isNewline
+    succeed ()
+     |. Parser.token "\n"
+     |. optionalNewlines
 
 
 optionalNewlines : Parser ()
 optionalNewlines =
-    ignore zeroOrMore isNewline
+    chompWhile isNewline
 
 
 nextToken : Parser Token
 nextToken =
-    delayedCommit optionalSpaces <|
-        succeed identity
-            |. optionalSpaces
-            |= token
+    succeed identity
+        |. optionalSpaces
+        |= token
 
 
 tokensHelp : List Token -> Parser (List Token)
@@ -298,18 +293,17 @@ tokensHelp revTokens =
 
 tokens : Parser (List Token)
 tokens =
-    inContext "tokens" <|
-        succeed identity
-            |. optionalSpaces
-            |= andThen (\t -> tokensHelp [ t ]) token
-            |. optionalSpaces
+    succeed identity
+        |. optionalSpaces
+        |= andThen (\t -> tokensHelp [ t ]) token
+        |. optionalSpaces
 
 
 nextLine : Parser (List Token)
 nextLine =
-    delayedCommit newlines <|
-        succeed identity
-            |= tokens
+    succeed identity
+        |. newlines
+        |= tokens
 
 
 linesHelp : List (List Token) -> Parser (List (List Token))
@@ -324,14 +318,13 @@ linesHelp revLines =
 
 lines : Parser (List (List Token))
 lines =
-    inContext "lines" <|
-        succeed identity
-            |. optionalNewlines
-            |= andThen (\l -> linesHelp [ l ]) tokens
-            |. optionalNewlines
-            |. end
+    succeed identity
+        |. optionalNewlines
+        |= andThen (\l -> linesHelp [ l ]) tokens
+        |. optionalNewlines
+        |. end
 
 
-tokenize : String -> Result Error (List (List Token))
+tokenize : String -> Result (List DeadEnd) (List (List Token))
 tokenize input =
     run lines input

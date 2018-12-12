@@ -1,7 +1,4 @@
-module Preview.Html
-    exposing
-        ( view
-        )
+module Preview.Html exposing (view)
 
 {-| Preview HTML & SVG
 
@@ -12,10 +9,12 @@ module Preview.Html
 
 -}
 
-import Html exposing (..)
+import Html exposing (Html)
+import Html.Attributes
+import Html.Parser
+import Parser
 import Svg
-import HtmlParser
-import HtmlParser.Util
+import VirtualDom
 
 
 {-| HTML tags to remove from preview
@@ -25,17 +24,18 @@ unsafeTagNames =
     [ "script", "iframe", "object", "embed" ]
 
 
-isSafeElement : String -> HtmlParser.Attributes -> List HtmlParser.Node -> Bool
+isSafeElement : String -> List ( String, String ) -> List Html.Parser.Node -> Bool
 isSafeElement tagName attributes children =
     not (List.member tagName unsafeTagNames)
 
 
-keepIfSafeNode : HtmlParser.Node -> Maybe HtmlParser.Node
+keepIfSafeNode : Html.Parser.Node -> Maybe Html.Parser.Node
 keepIfSafeNode node =
     case node of
-        HtmlParser.Element tagName attrs children ->
+        Html.Parser.Element tagName attrs children ->
             if isSafeElement tagName attrs children then
-                Just <| HtmlParser.Element tagName attrs (sanitizeNodes children)
+                Just <| Html.Parser.Element tagName attrs (sanitizeNodes children)
+
             else
                 Nothing
 
@@ -43,34 +43,54 @@ keepIfSafeNode node =
             Just node
 
 
-sanitizeNodes : List HtmlParser.Node -> List HtmlParser.Node
+sanitizeNodes : List Html.Parser.Node -> List Html.Parser.Node
 sanitizeNodes =
     List.filterMap keepIfSafeNode
+
+
+toDisplayAttribute : (String, String) -> Html.Attribute msg
+toDisplayAttribute (key, value) =
+    Html.Attributes.attribute key value
+
+
+toDisplayHtml : Html.Parser.Node -> Html.Html msg
+toDisplayHtml node =
+    case node of
+        Html.Parser.Element tagName attrs children ->
+            VirtualDom.node tagName (List.map toDisplayAttribute attrs) (List.map toDisplayHtml children)
+        
+        Html.Parser.Text text ->
+            Html.text text
+
+        Html.Parser.Comment _ ->
+            Html.text ""
 
 
 {-| Previews a HTML string as sanitized HTML
 -}
 view : Bool -> String -> Html msg
 view isSVG source =
-    let
-        elements =
-            source
-                |> HtmlParser.parse
-                |> sanitizeNodes
+    case Html.Parser.run source of
+        Ok unsafeElements ->
+            let
+                elements =
+                    sanitizeNodes unsafeElements
 
-        hasSurroundingSVGTag =
-            case List.head elements of
-                Just (HtmlParser.Element "svg" _ _) ->
-                    True
+                hasSurroundingSVGTag =
+                    case List.head elements of
+                        Just (Html.Parser.Element "svg" _ _) ->
+                            True
 
-                _ ->
-                    False
-    in
-        if isSVG && not hasSurroundingSVGTag then
-            elements
-                |> HtmlParser.Util.toVirtualDomSvg
-                |> Svg.svg []
-        else
-            elements
-                |> HtmlParser.Util.toVirtualDom
-                |> div []
+                        _ ->
+                            False
+            in
+                if isSVG && not hasSurroundingSVGTag then
+                    List.map toDisplayHtml elements
+                        |> Svg.svg []
+
+                else
+                    List.map toDisplayHtml elements
+                        |> Html.div []
+
+        Err error ->
+            Html.text "(Error)"

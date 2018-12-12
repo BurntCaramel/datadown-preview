@@ -1,24 +1,23 @@
-module Datadown.Expressions
-    exposing
-        ( Operator(..)
-        , Token(..)
-        , IntExpression(..)
-        , BoolExpression(..)
-        , Expression(..)
-        , ParseError(..)
-        , EvaluateError(..)
-        , tokenize
-        , parseExpression
-        , evaluateAsInt
-        , evaluateAsJson
-        )
+module Datadown.Expressions exposing
+    ( BoolExpression(..)
+    , EvaluateError(..)
+    , Expression(..)
+    , IntExpression(..)
+    , Operator(..)
+    , ParseError(..)
+    , Token(..)
+    , evaluateAsInt
+    , evaluateAsJson
+    , parseExpression
+    , tokenize
+    )
 
 import Char
-import Set exposing (Set)
-import Parser exposing (..)
-import JsonValue exposing (..)
-import Datadown.Url exposing (Url(..), MathFunction(..), TimeFunction(..), schemeAndStringToUrl)
 import Datadown.Procedures exposing (Procedure(..), toRpcJson)
+import Datadown.Url exposing (MathFunction(..), TimeFunction(..), Url(..), schemeAndStringToUrl)
+import Json.Value exposing (..)
+import Parser exposing (..)
+import Set exposing (Set)
 
 
 type Operator
@@ -59,7 +58,7 @@ isSpace c =
 
 optionalSpaces : Parser ()
 optionalSpaces =
-    ignore zeroOrMore isSpace
+    chompWhile isSpace
 
 
 isIdentifierBodyChar : Char -> Bool
@@ -73,9 +72,12 @@ isIdentifierBodyChar c =
 
 identifier : Parser Token
 identifier =
-    succeed Identifier
-        |. symbol "$"
-        |= keep oneOrMore isIdentifierBodyChar
+    map Identifier <|
+        variable
+            { start = (\c -> c == '$')
+            , inner = isIdentifierBodyChar
+            , reserved = Set.empty
+            }
 
 
 operator : Parser Operator
@@ -94,7 +96,7 @@ operator =
 
 whitespaceChars : Set Char
 whitespaceChars =
-    [ ' ', '\n', '\x0D', '\t' ]
+    [ ' ', '\n', '\u{000D}', '\t' ]
         |> Set.fromList
 
 
@@ -106,37 +108,35 @@ isNonWhitespace c =
 
 url : Parser Token
 url =
-    delayedCommitMap schemeAndStringToUrl
-        (keep oneOrMore Char.isLower
-            |. symbol ":"
-        )
-        (keep oneOrMore isNonWhitespace)
-        |> map Url
+    backtrackable <|
+    map Url <|
+    succeed schemeAndStringToUrl
+        |= (chompWhile Char.isLower |> getChompedString)
+        |. symbol ":"
+        |= (chompWhile isNonWhitespace |> getChompedString)
 
 
 token : Parser Token
 token =
-    inContext "token" <|
-        oneOf
-            [ identifier
-            , succeed Operator
-                |= operator
-            , succeed IntLiteral
-                |= int
-            , succeed (BoolLiteral True)
-                |. symbol ".true"
-            , succeed (BoolLiteral False)
-                |. symbol ".false"
-            , url
-            ]
+    oneOf
+        [ identifier
+        , succeed Operator
+            |= operator
+        , succeed IntLiteral
+            |= int
+        , succeed (BoolLiteral True)
+            |. symbol ".true"
+        , succeed (BoolLiteral False)
+            |. symbol ".false"
+        , url
+        ]
 
 
 nextToken : Parser Token
 nextToken =
-    delayedCommit optionalSpaces <|
-        succeed identity
-            |. optionalSpaces
-            |= token
+    succeed identity
+        |. optionalSpaces
+        |= token
 
 
 tokensHelp : List Token -> Parser (List Token)
@@ -150,14 +150,13 @@ tokensHelp revTokens =
 
 tokens : Parser (List Token)
 tokens =
-    inContext "tokens" <|
-        succeed identity
-            |. optionalSpaces
-            |= andThen (\t -> tokensHelp [ t ]) token
-            |. optionalSpaces
+    succeed identity
+        |. optionalSpaces
+        |= andThen (\t -> tokensHelp [ t ]) token
+        |. optionalSpaces
 
 
-tokenize : String -> Result Parser.Error (List Token)
+tokenize : String -> Result (List Parser.DeadEnd) (List Token)
 tokenize input =
     run tokens input
 
@@ -183,7 +182,7 @@ type Expression
 
 type ParseError
     = CannotBeEmpty
-    | Tokenization Parser.Error
+    | Tokenization (List Parser.DeadEnd)
     | OperatorMissingLeft Operator
     | OperatorMissingRight Operator
     | OperatorMustHaveNumericLeft Expression Operator
@@ -193,12 +192,12 @@ type ParseError
 
 
 parseNext : Expression -> List Token -> Result ParseError Expression
-parseNext right tokens =
-    case ( right, tokens ) of
+parseNext right tokensList =
+    case ( right, tokensList ) of
         ( Empty, [] ) ->
             Err CannotBeEmpty
 
-        ( right, [] ) ->
+        ( _, [] ) ->
             Ok right
 
         ( Empty, (Identifier id) :: rest ) ->
@@ -210,8 +209,8 @@ parseNext right tokens =
         ( Empty, (BoolLiteral b) :: rest ) ->
             parseNext (UseBool b |> Bool) rest
 
-        ( Empty, (Url url) :: rest ) ->
-            case url of
+        ( Empty, (Url urlWithScheme) :: rest ) ->
+            case urlWithScheme of
                 Math (Ok f) ->
                     Math0 f
                         |> Int
@@ -222,12 +221,12 @@ parseNext right tokens =
                         urlString =
                             "https:" ++ sansScheme
                     in
-                        HttpGetJson urlString
-                            |> Procedure
-                            |> Ok
+                    HttpGetJson urlString
+                        |> Procedure
+                        |> Ok
 
-                url ->
-                    Err <| UnsupportedUrl url
+                _ ->
+                    Err <| UnsupportedUrl urlWithScheme
 
         ( Empty, (Operator op) :: rest ) ->
             Err <| OperatorMissingRight op
@@ -238,8 +237,9 @@ parseNext right tokens =
         ( Int first, (Operator op) :: rest ) ->
             case parseNext Empty rest of
                 Ok (Int (IntOperator third nextOp second)) ->
-                    if (precendenceOfOperator nextOp) >= (precendenceOfOperator op) then
+                    if precendenceOfOperator nextOp >= precendenceOfOperator op then
                         Ok <| Int <| IntOperator (IntOperator third nextOp second) op first
+
                     else
                         Ok <| Int <| IntOperator third nextOp (IntOperator second op first)
 
@@ -252,16 +252,16 @@ parseNext right tokens =
                 Err error ->
                     Err error
 
-        ( right, (Operator op) :: rest ) ->
+        ( _, (Operator op) :: rest ) ->
             Err <| OperatorMustHaveNumericLeft right op
 
-        ( right, tokens ) ->
-            Err <| Invalid right tokens
+        ( _, _ ) ->
+            Err <| Invalid right tokensList
 
 
 parseTokens : List Token -> Result ParseError Expression
-parseTokens tokens =
-    tokens
+parseTokens tokensList =
+    tokensList
         |> List.reverse
         |> parseNext Empty
 
@@ -312,15 +312,15 @@ evaluateIntExpression resolveIdentifier expression =
             Result.map2 (//)
                 (evaluateIntExpression resolveIdentifier left)
                 (evaluateIntExpression resolveIdentifier right)
-        
+
         Math0 f ->
             case f of
                 Pi ->
                     pi |> round |> Ok
-                
+
                 E ->
                     e |> round |> Ok
-        
+
         Time0 f ->
             case f of
                 SecondsSinceUnixEpoch ->
@@ -330,8 +330,8 @@ evaluateIntExpression resolveIdentifier expression =
 evaluateAsInt : (String -> Maybe Int) -> Expression -> Result EvaluateError Int
 evaluateAsInt resolveIdentifier expression =
     case expression of
-        Int expression ->
-            evaluateIntExpression resolveIdentifier expression
+        Int intExpression ->
+            evaluateIntExpression resolveIdentifier intExpression
 
         _ ->
             Err <| CannotEvaluateExpression expression
@@ -340,9 +340,9 @@ evaluateAsInt resolveIdentifier expression =
 evaluateAsJson : (String -> Maybe Int) -> Expression -> Result EvaluateError JsonValue
 evaluateAsJson resolveIdentifier expression =
     case expression of
-        Int expression ->
-            evaluateIntExpression resolveIdentifier expression
-                |> Result.map (toFloat >> JsonValue.NumericValue)
+        Int intExpression ->
+            evaluateIntExpression resolveIdentifier intExpression
+                |> Result.map (toFloat >> Json.Value.NumericValue)
 
         Procedure procedure ->
             toRpcJson procedure

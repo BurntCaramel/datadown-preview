@@ -1,8 +1,7 @@
-module Datadown.Procedures
-    exposing
-        ( Procedure(..)
-        , toRpcJson
-        )
+module Datadown.Procedures exposing
+    ( Procedure(..)
+    , toRpcJson
+    )
 
 {-| Procedures
 
@@ -13,7 +12,7 @@ module Datadown.Procedures
 
 -}
 
-import JsonValue exposing (..)
+import Json.Value exposing (..)
 
 
 type Procedure
@@ -24,7 +23,7 @@ rpcJson : String -> Maybe JsonValue -> String -> JsonValue
 rpcJson method maybeParams id =
     [ Just ( "jsonrpc", StringValue "2.0" )
     , Just ( "method", StringValue method )
-    , Maybe.map ((,) "params") maybeParams
+    , Maybe.map (\b -> ( "params", b )) maybeParams
     , Just ( "id", StringValue id )
     ]
         |> List.filterMap identity

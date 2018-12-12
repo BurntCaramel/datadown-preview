@@ -1,18 +1,19 @@
 module Samples exposing (tourDocumentSources)
 
 import Dict exposing (Dict)
-import Samples.Welcome
-import Samples.Clock
-import Samples.Button
-import Samples.Images
 import Samples.API
-import Samples.UserProfile
-import Samples.WikiModel
-import Samples.FileBrowserModel
-import Samples.Csv
-import Samples.TypographyEssentials
-import Samples.MessagingSchema
 import Samples.Article
+import Samples.Button
+import Samples.Clock
+import Samples.Csv
+import Samples.FileBrowserModel
+import Samples.Images
+import Samples.MessagingSchema
+import Samples.TypographyEssentials
+import Samples.UserProfile
+import Samples.Welcome
+import Samples.WikiModel
+
 
 tourDocumentSources : Dict String String
 tourDocumentSources =

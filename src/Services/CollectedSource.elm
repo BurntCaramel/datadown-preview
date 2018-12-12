@@ -1,11 +1,10 @@
-module Services.CollectedSource
-    exposing
-        ( ContentInfo
-        , listDocuments
-        )
+module Services.CollectedSource exposing
+    ( ContentInfo
+    , listDocuments
+    )
 
-import Json.Decode exposing (..)
 import Http
+import Json.Decode exposing (..)
 import Task exposing (Task)
 
 
@@ -34,5 +33,5 @@ listDocuments owner repo branch =
             ]
                 |> String.join "/"
     in
-        Http.get url (list contentInfoDecoder)
-            |> Http.toTask
+    Http.get url (list contentInfoDecoder)
+        |> Http.toTask

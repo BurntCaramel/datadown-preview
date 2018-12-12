@@ -1,17 +1,16 @@
-module Routes
-    exposing
-        ( Route(..)
-        , CollectionSource(..)
-        , EditMode(..)
-        , parseLocation
-        , toPath
-        , collectionSourceFor
-        , CollectionSourceId
-        , collectionSourceToId
-        )
+module Routes exposing
+    ( CollectionSource(..)
+    , CollectionSourceId
+    , EditMode(..)
+    , Route(..)
+    , collectionSourceFor
+    , collectionSourceToId
+    , parseUrl
+    , toPath
+    )
 
 import Dict exposing (Dict)
-import Navigation exposing (Location)
+import Url exposing (Url)
 
 
 type EditMode
@@ -57,38 +56,38 @@ fromPath path =
                 |> String.split "/"
                 |> List.filter ((/=) "")
     in
-        case segments of
-            [] ->
-                Landing
+    case segments of
+        [] ->
+            Landing
 
-            "tour" :: rest ->
-                case rest of
-                    [] ->
-                        Collection Tour
+        "tour" :: rest ->
+            case rest of
+                [] ->
+                    Collection Tour
 
-                    [ "content" ] ->
-                        CollectionContentSources Tour
+                [ "content" ] ->
+                    CollectionContentSources Tour
 
-                    items ->
-                        CollectionItem Tour (String.join "/" items) WithPreview
+                items ->
+                    CollectionItem Tour (String.join "/" items) WithPreview
 
-            "github" :: owner :: repo :: ref :: rest ->
-                let
-                    collection =
-                        GitHubRepo owner repo ref
-                in
-                    case rest of
-                        [] ->
-                            Collection collection
+        "github" :: owner :: repo :: ref :: rest ->
+            let
+                collection =
+                    GitHubRepo owner repo ref
+            in
+            case rest of
+                [] ->
+                    Collection collection
 
-                        [ "content" ] ->
-                            CollectionContentSources collection
+                [ "content" ] ->
+                    CollectionContentSources collection
 
-                        items ->
-                            CollectionItem collection (String.join "/" items) WithPreview
+                items ->
+                    CollectionItem collection (String.join "/" items) WithPreview
 
-            components ->
-                NotFound (String.join "/" components)
+        components ->
+            NotFound (String.join "/" components)
 
 
 toPath : Route -> String
@@ -151,6 +150,6 @@ collectionSourceToId collectionSource =
         |> toPath
 
 
-parseLocation : Location -> Route
-parseLocation location =
-    fromPath location.pathname
+parseUrl : Url -> Route
+parseUrl url =
+    fromPath url.path

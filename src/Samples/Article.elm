@@ -1,7 +1,9 @@
 module Samples.Article exposing (source)
 
+
 source : String
-source = """
+source =
+    """
 # Article with HTML & CSS
 
 ## template

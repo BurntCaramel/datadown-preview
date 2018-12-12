@@ -1,12 +1,11 @@
-module Expressions.Evaluate
-    exposing
-        ( evaluateTokenLines
-        , Error(..)
-        )
+module Expressions.Evaluate exposing
+    ( Error(..)
+    , evaluateTokenLines
+    )
 
-import Expressions.Tokenize exposing (Operator(..), Token(..), Url(..), MathFunction(..), HttpFunction(..), urlToString)
-import JsonValue exposing (JsonValue(..))
 import Datadown.Rpc
+import Expressions.Tokenize exposing (HttpFunction(..), MathFunction(..), Operator(..), Token(..), Url(..), urlToString)
+import Json.Value exposing (JsonValue(..))
 
 
 type Error
@@ -44,7 +43,6 @@ toFloat value =
         StringValue s ->
             s
                 |> String.toFloat
-                |> Result.toMaybe
 
         ArrayValue (item :: []) ->
             toFloat item
@@ -57,7 +55,7 @@ useString : JsonValue -> Maybe String
 useString value =
     case value of
         NumericValue f ->
-            Just <| toString f
+            Just <| String.fromFloat f
 
         StringValue s ->
             Just s
@@ -73,7 +71,7 @@ rpcJson : String -> Maybe JsonValue -> JsonValue -> JsonValue
 rpcJson method maybeParams id =
     [ Just ( "jsonrpc", StringValue "2.0" )
     , Just ( "method", StringValue method )
-    , Maybe.map ((,) "params") maybeParams
+    , Maybe.map (\b -> ( "params", b )) maybeParams
     , Just ( "id", id )
     ]
         |> List.filterMap identity
@@ -94,112 +92,114 @@ rpcJsonForHttpGet url =
 
 
 processOperator : Operator -> JsonValue -> JsonValue -> Result Error JsonValue
-processOperator op a b =
+processOperator op jsonA jsonB =
     case op of
         Add ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <| NumericValue <| a + b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         Subtract ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <| NumericValue <| a - b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         Multiply ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <| NumericValue <| a * b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         Divide ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <| NumericValue <| a / b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         Exponentiate ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <| NumericValue <| a ^ b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         EqualTo ->
-            Ok (BoolValue (a == b))
+            Ok (BoolValue (jsonA == jsonB))
 
         LessThan orEqual ->
-            case ( a, b ) of
+            case ( jsonA, jsonB ) of
                 ( NumericValue a, NumericValue b ) ->
                     Ok <|
                         BoolValue <|
                             if orEqual then
                                 a <= b
+
                             else
                                 a < b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         GreaterThan orEqual ->
-            case ( a, b ) of
+            case ( jsonA, jsonB ) of
                 ( NumericValue a, NumericValue b ) ->
                     Ok <|
                         BoolValue <|
                             if orEqual then
                                 a >= b
+
                             else
                                 a > b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         MathModule function ->
-            case ( toFloat a, toFloat b ) of
+            case ( toFloat jsonA, toFloat jsonB ) of
                 ( Just a, Just b ) ->
                     Ok <|
                         NumericValue <|
                             case function of
                                 Sine ->
-                                    a * (sin b)
+                                    a * sin b
 
                                 Cosine ->
-                                    a * (cos b)
+                                    a * cos b
 
                                 Tangent ->
-                                    a * (tan b)
+                                    a * tan b
 
                                 Turns ->
-                                    a * (turns b)
+                                    a * turns b
 
                 _ ->
-                    Err <| InvalidValuesForOperator op a b
+                    Err <| InvalidValuesForOperator op jsonA jsonB
 
         HttpModule function ->
             case function of
                 GetJson ->
-                    case useString b of
+                    case useString jsonB of
                         Just url ->
                             Ok <| rpcJsonForHttpGet url
 
                         _ ->
-                            Err <| InvalidValuesForOperator op a b
+                            Err <| InvalidValuesForOperator op jsonA jsonB
 
 
 valueOperatorOnList : Operator -> JsonValue -> List JsonValue -> Result Error JsonValue
-valueOperatorOnList op a rest =
-    List.foldl ((processOperator op |> flip) >> Result.andThen) (Ok a) rest
+valueOperatorOnList op json rest =
+    List.foldl ((processOperator op |> (\f b a -> f a b)) >> Result.andThen) (Ok json) rest
 
 
 urlWithPathsList : String -> List JsonValue -> Result Error String
@@ -220,7 +220,7 @@ urlWithPathsList prefix pathValues =
                                 _ ->
                                     prefix ++ "/" ++ string
                     in
-                        urlWithPathsList newPrefix tl
+                    urlWithPathsList newPrefix tl
 
                 Nothing ->
                     Err <| CannotJoinUrl prefix
@@ -250,7 +250,7 @@ requireValue resolveIdentifier token =
 
                 _ ->
                     Err NotValue
-                        |> Debug.log (toString string)
+                        |> Debug.log (Debug.toString string)
 
         Url (Time string) ->
             case resolveIdentifier ("time:" ++ string) of
@@ -270,9 +270,9 @@ requireValueList resolveIdentifier tokens =
         combineResults =
             List.foldr (Result.map2 (::)) (Ok [])
     in
-        tokens
-            |> List.map (requireValue resolveIdentifier)
-            |> combineResults
+    tokens
+        |> List.map (requireValue resolveIdentifier)
+        |> combineResults
 
 
 processValueExpression : JsonValue -> (String -> Result e JsonValue) -> List Token -> Result Error JsonValue
@@ -329,9 +329,9 @@ evaluateTokens resolveIdentifier previousValue tokens =
                 values =
                     requireValueList resolveIdentifier tl
             in
-                -- Support e.g. * 5 5 5 == 125
-                Result.map2 (,) start values
-                    |> Result.andThen (uncurry <| valueOperatorOnList operator)
+            -- Support e.g. * 5 5 5 == 125
+            Result.map2 (\a b -> ( a, b )) start values
+                |> Result.andThen ((\f ( a, b ) -> f a b) <| valueOperatorOnList operator)
 
         hd :: tl ->
             case requireValue resolveIdentifier hd of
@@ -361,5 +361,5 @@ evaluateTokenLines resolveIdentifier lines =
                     Just (Err error) ->
                         Just (Err error)
     in
-        List.foldl reducer Nothing lines
-            |> Maybe.withDefault (Err NoInput)
+    List.foldl reducer Nothing lines
+        |> Maybe.withDefault (Err NoInput)
