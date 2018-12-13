@@ -147,12 +147,17 @@ evaluateExpressions model resolveFromDocument parsedExpressions =
                 Nothing ->
                     defaultResolveWithModel key
     in
-    case parsedExpressions of
-        Err error ->
-            Err <| Evaluate.Parsing (Debug.toString error)
+        case parsedExpressions of
+            Err error ->
+                case error of
+                    Parser deadEnds ->
+                        Err <| Evaluate.Parsing ("Could not parse: " ++ Debug.toString deadEnds)
 
-        Ok expressions ->
-            evaluateTokenLines resolveWithModel expressions
+                    Evaluate evaluateError ->
+                        Err <| Evaluate.Parsing ("Could not parse: " ++ Debug.toString evaluateError)
+
+            Ok expressions ->
+                evaluateTokenLines resolveWithModel expressions
 
 
 valueForRpcID : Model -> String -> List String -> JsonValue -> Result Evaluate.Error JsonValue

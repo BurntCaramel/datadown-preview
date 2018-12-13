@@ -183,28 +183,17 @@ url =
 operator : Parser Operator
 operator =
     oneOf
-        [ succeed Add
-            |. symbol "+"
-        , succeed Subtract
-            |. symbol "-"
-        , succeed Exponentiate
-            |. symbol "**"
-        , succeed Multiply
-            |. symbol "*"
-        , succeed Divide
-            |. symbol "/"
-        , succeed EqualTo
-            |. symbol "=="
-        , succeed (LessThan True)
-            |. symbol "<="
-        , succeed (LessThan False)
-            |. symbol "<"
-        , succeed (GreaterThan True)
-            |. symbol ">="
-        , succeed (GreaterThan False)
-            |. symbol ">"
-        , succeed (HttpModule GetJson)
-            |. keyword "HTTP.get_json"
+        [ map (\_ -> Add) (symbol "+")
+        , map (\_ -> Subtract) (symbol "-")
+        , map (\_ -> Exponentiate) (symbol "**")
+        , map (\_ -> Multiply) (symbol "*")
+        , map (\_ -> Divide) (symbol "/")
+        , map (\_ -> EqualTo) (symbol "==")
+        , map (\_ -> LessThan True) (symbol "<=")
+        , map (\_ -> LessThan False) (symbol "<")
+        , map (\_ -> GreaterThan True) (symbol ">=")
+        , map (\_ -> GreaterThan False) (symbol ">")
+        , map (\_ -> HttpModule GetJson) (keyword "HTTP.get_json")
         ]
 
 
@@ -214,37 +203,30 @@ value =
         [ succeed (negate >> NumericValue)
             |. symbol "-"
             |= float
-        , succeed NumericValue
-            |= float
-        , succeed (BoolValue True)
-            |. keyword "true"
-        , succeed (BoolValue False)
-            |. keyword "false"
+        , map NumericValue float
+        , map (\_ -> BoolValue True) (keyword "true")
+        , map (\_ -> BoolValue False) (keyword "false")
         ]
 
 
 magicNumbers : Parser JsonValue
 magicNumbers =
     oneOf
-        [ succeed e
-            |. keyword "Math.e"
-        , succeed pi
-            |. keyword "Math.pi"
+        [ map (\_ -> e) (keyword "Math.e")
+        , map (\_ -> pi) (keyword "Math.pi")
         ]
         |> map NumericValue
+        |> backtrackable
 
 
 token : Parser Token
 token =
     oneOf
-        [ succeed Value
-            |= magicNumbers
+        [ map Value magicNumbers
         , url
         , identifier
-        , succeed Value
-            |= value
-        , succeed Operator
-            |= operator
+        , map Value value
+        , map Operator operator
         ]
 
 
@@ -265,9 +247,8 @@ optionalSpaces =
 
 newlines : Parser ()
 newlines =
-    succeed ()
-     |. Parser.token "\n"
-     |. optionalNewlines
+    Parser.token "\n"
+        |> andThen (\_ -> optionalNewlines)
 
 
 optionalNewlines : Parser ()
@@ -280,6 +261,7 @@ nextToken =
     succeed identity
         |. optionalSpaces
         |= token
+        |. optionalSpaces
 
 
 tokensHelp : List Token -> Parser (List Token)
@@ -287,7 +269,8 @@ tokensHelp revTokens =
     oneOf
         [ nextToken
             |> andThen (\t -> tokensHelp (t :: revTokens))
-        , succeed (List.reverse revTokens)
+        , lazy <|
+            \_ -> succeed (List.reverse revTokens)
         ]
 
 
@@ -302,7 +285,7 @@ tokens =
 nextLine : Parser (List Token)
 nextLine =
     succeed identity
-        |. newlines
+        |. spaces
         |= tokens
 
 
@@ -318,13 +301,33 @@ linesHelp revLines =
 
 lines : Parser (List (List Token))
 lines =
-    succeed identity
-        |. optionalNewlines
-        |= andThen (\l -> linesHelp [ l ]) tokens
-        |. optionalNewlines
-        |. end
+    let
+        linesHelp2 revLines =
+            succeed identity
+                |. backtrackable optionalSpaces
+                |= oneOf
+                    [ succeed (Loop revLines)
+                        |. Parser.token "\n"
+                    , map (\l -> Loop (l :: revLines)) <|
+                        nextLine
+                        -- |. spaces
+                        |. chompUntilEndOr "\n"
+                    -- [ succeed (\l -> Loop (l :: revLines))
+                    --     |= nextLine
+                    --     |. spaces
+                    --     -- |. chompUntilEndOr "\n"
+                    , succeed ()
+                        |> map (\_ -> Done (List.reverse revLines))
+                    ]
+    in
+        loop [] linesHelp2
 
 
 tokenize : String -> Result (List DeadEnd) (List (List Token))
 tokenize input =
-    run lines input
+    case run lines input of
+        Err deadEnds ->
+            Err ({ col = -1, row = -1, problem = Problem input } :: deadEnds)
+
+        Ok tokenLines ->
+            Ok tokenLines
